@@ -15,7 +15,6 @@ white_bkgd = True
 
 N_rand = 1024
 
-i_testset = 50000
 testskip = 1
 
-i_video = 100000
+lrate = 1e-4
