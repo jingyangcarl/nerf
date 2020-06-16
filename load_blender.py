@@ -51,8 +51,13 @@ def pose_spherical_(theta, phi, radius, height):
     return c2w
 
 
-def load_blender_data(basedir, half_res=False, testskip=1):
-    splits = ['train', 'val', 'test']
+# def load_blender_data(basedir, half_res=False, testskip=1):
+def load_blender_data(basedir, half_res=False, testskip=1, withDepth=False):
+    # splits = ['train', 'val', 'test']
+    if withDepth:
+        splits = ['train', 'val', 'test', 'depth_train', 'depth_val', 'depth_test']
+    else:
+        splits = ['train', 'val', 'test']
     metas = {}
     for s in splits:
         with open(os.path.join(basedir, 'transforms_{}.json'.format(s)), 'r') as fp:
@@ -65,13 +70,18 @@ def load_blender_data(basedir, half_res=False, testskip=1):
         meta = metas[s]
         imgs = []
         poses = []
-        if s=='train' or testskip==0:
+        # if s=='train' or testskip==0:
+        if s=='train' or s=='depth_train' or testskip==0:
             skip = 1
         else:
             skip = testskip
             
         for frame in meta['frames'][::skip]:
-            fname = os.path.join(basedir, frame['file_path'] + '.png')
+            # fname = os.path.join(basedir, frame['file_path'] + '.png')
+            if 'depth' in s:
+                fname = os.path.join(basedir, frame['file_path'] + '.exr')
+            else:
+                fname = os.path.join(basedir, frame['file_path'] + '.png')
             imgs.append(imageio.imread(fname))
             poses.append(np.array(frame['transform_matrix']))
         imgs = (np.array(imgs) / 255.).astype(np.float32) # keep all 4 channels (RGBA)

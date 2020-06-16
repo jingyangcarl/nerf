@@ -617,7 +617,8 @@ def train():
             args.datadir, args.half_res, args.testskip)
         print('Loaded blender', images.shape,
               render_poses.shape, hwf, args.datadir)
-        i_train, i_val, i_test = i_split
+        # i_train, i_val, i_test = i_split
+        i_train, i_val, i_test, i_depth_train, i_depth_val, i_depth_test = i_split
 
         # near = 2.
         # far = 6.
@@ -751,6 +752,10 @@ def train():
     print('TRAIN views are', i_train)
     print('TEST views are', i_test)
     print('VAL views are', i_val)
+
+    print("DEPTH TRAIN views are", i_depth_train)
+    print("DEPTH TEST views are", i_depth_test)
+    print("DEPTH VAL views are", i_depth_val)
 
     # Summary writers
     writer = tf.contrib.summary.create_file_writer(
