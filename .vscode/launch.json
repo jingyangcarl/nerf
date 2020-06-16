@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "config_miaxmo_12_2_2_cl_no8020_z.txt"
+                "config_miaxmo_14_1_1_cl_no8020_z_depth.txt"
             ]
         },
         {
