@@ -14,6 +14,13 @@ trans_t = lambda t : tf.convert_to_tensor([
     [0,0,0,1],
 ], dtype=tf.float32)
 
+trans_t_ = lambda t, h : tf.convert_to_tensor([
+    [1,0,0,0],
+    [0,1,0,h],
+    [0,0,1,t],
+    [0,0,0,1],
+], dtype=tf.float32)
+
 rot_phi = lambda phi : tf.convert_to_tensor([
     [1,0,0,0],
     [0,tf.cos(phi),-tf.sin(phi),0],
@@ -36,6 +43,12 @@ def pose_spherical(theta, phi, radius):
     c2w = np.array([[-1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]]) @ c2w
     return c2w
     
+def pose_spherical_(theta, phi, radius, height):
+    c2w = trans_t_(radius, height)
+    c2w = rot_phi(phi/180.*np.pi) @ c2w
+    c2w = rot_theta(theta/180.*np.pi) @ c2w
+    c2w = np.array([[-1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]]) @ c2w
+    return c2w
 
 
 def load_blender_data(basedir, half_res=False, testskip=1):
@@ -77,7 +90,9 @@ def load_blender_data(basedir, half_res=False, testskip=1):
     focal = .5 * W / np.tan(.5 * camera_angle_x)
     
     # render_poses = tf.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180,180,40+1)[:-1]],0)
-    render_poses = tf.stack([pose_spherical(angle, -30.0, 1.5) for angle in np.linspace(-180,180,40+1)[:-1]],0)
+    # render_poses = tf.stack([pose_spherical(angle, -30.0, 1.5) for angle in np.linspace(-180,180,40+1)[:-1]],0)
+    
+    render_poses = tf.stack([pose_spherical_(angle, 0.0, 1.5, 1.1) for angle in np.linspace(-180,180,40+1)[:-1]],0)
     
     if half_res:
         imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
