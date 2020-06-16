@@ -52,9 +52,9 @@ def pose_spherical_(theta, phi, radius, height):
 
 
 # def load_blender_data(basedir, half_res=False, testskip=1):
-def load_blender_data(basedir, half_res=False, testskip=1, withDepth=False):
+def load_blender_data(basedir, half_res=False, testskip=1, use_depth=False):
     # splits = ['train', 'val', 'test']
-    if withDepth:
+    if use_depth:
         splits = ['train', 'val', 'test', 'depth_train', 'depth_val', 'depth_test']
     else:
         splits = ['train', 'val', 'test']

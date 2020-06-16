@@ -545,6 +545,9 @@ def config_parser():
     parser.add_argument("--half_res", action='store_true',
                         help='load blender synthetic data at 400x400 instead of 800x800')
 
+    parser.add_argument("--use_depth", action="store_true", 
+                        help='indicate if depth images will be used')
+
     # llff flags
     parser.add_argument("--factor", type=int, default=8,
                         help='downsample factor for LLFF images')
@@ -614,7 +617,7 @@ def train():
 
     elif args.dataset_type == 'blender':
         images, poses, render_poses, hwf, i_split = load_blender_data(
-            args.datadir, args.half_res, args.testskip)
+            args.datadir, args.half_res, args.testskip, args.use_depth)
         print('Loaded blender', images.shape,
               render_poses.shape, hwf, args.datadir)
         # i_train, i_val, i_test = i_split
