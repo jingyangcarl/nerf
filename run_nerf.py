@@ -357,7 +357,9 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
     for i, c2w in enumerate(render_poses):
         print(i, time.time() - t)
         t = time.time()
-        rgb, disp, acc, _ = render(
+        # rgb, disp, acc, _ = render(
+        #     H, W, focal, chunk=chunk, c2w=c2w[:3, :4], **render_kwargs)
+        rgb, disp, acc, depth, _ = render(
             H, W, focal, chunk=chunk, c2w=c2w[:3, :4], **render_kwargs)
         rgbs.append(rgb.numpy())
         disps.append(disp.numpy())
@@ -822,7 +824,10 @@ def train():
         with tf.GradientTape() as tape:
 
             # Make predictions for color, disparity, accumulated opacity.
-            rgb, disp, acc, extras = render(
+            # rgb, disp, acc, extras = render(
+            #     H, W, focal, chunk=args.chunk, rays=batch_rays,
+            #     verbose=i < 10, retraw=True, **render_kwargs_train)
+            rgb, disp, acc, depth, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
@@ -904,8 +909,10 @@ def train():
                 target = images[img_i]
                 pose = poses[img_i, :3, :4]
 
-                rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
-                                                **render_kwargs_test)
+                # rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
+                #                                 **render_kwargs_test)
+                rgb, disp, acc, depth, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
+                                **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
                 
