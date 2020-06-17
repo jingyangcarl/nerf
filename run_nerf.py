@@ -762,9 +762,9 @@ def train():
     print('TEST views are', i_test)
     print('VAL views are', i_val)
 
-    print("DEPTH TRAIN views are", i_depth_train)
-    print("DEPTH TEST views are", i_depth_test)
-    print("DEPTH VAL views are", i_depth_val)
+    print("DEPTH TRAIN views are", i_depth_train) ## depth
+    print("DEPTH TEST views are", i_depth_test) ## depth
+    print("DEPTH VAL views are", i_depth_val) ## depth
 
     # Summary writers
     writer = tf.contrib.summary.create_file_writer(
@@ -796,8 +796,14 @@ def train():
             target = images[img_i]
             pose = poses[img_i, :3, :4]
 
+            # get corresponding depth
+            img_depth_i = len(i_train) + len(i_test) + len(i_val) ## depth
+            target_depth = images[img_depth_i] ## depth
+            pose_depth = poses[img_depth_i, :3, :4] ## depth
+
             if N_rand is not None:
                 rays_o, rays_d = get_rays(H, W, focal, pose)
+                rays_depth_o, rays_depth_d = get_rays(H, W, focal, pose_depth) ## depth
                 if i < args.precrop_iters:
                     dH = int(H//2 * args.precrop_frac)
                     dW = int(W//2 * args.precrop_frac)
@@ -814,10 +820,16 @@ def train():
                 select_inds = np.random.choice(
                     coords.shape[0], size=[N_rand], replace=False)
                 select_inds = tf.gather_nd(coords, select_inds[:, tf.newaxis])
+
                 rays_o = tf.gather_nd(rays_o, select_inds)
                 rays_d = tf.gather_nd(rays_d, select_inds)
                 batch_rays = tf.stack([rays_o, rays_d], 0)
                 target_s = tf.gather_nd(target, select_inds)
+
+                rays_depth_o = tf.gather_nd(rays_depth_o, select_inds) ## depth
+                rays_depth_d = tf.gather_nd(rays_depth_d, select_inds) ## depth
+                batch_rays_depth = tf.stack([rays_depth_o, rays_depth_d], 0) ## depth
+                target_depth_s = tf.gather_nd(target_depth, select_inds) ## depth
 
         #####  Core optimization loop  #####
 
@@ -827,12 +839,18 @@ def train():
             # rgb, disp, acc, extras = render(
             #     H, W, focal, chunk=args.chunk, rays=batch_rays,
             #     verbose=i < 10, retraw=True, **render_kwargs_train)
-            rgb, disp, acc, depth, extras = render(
+            rgb, disp, acc, _, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays,
+                verbose=i < 10, retraw=True, **render_kwargs_train)
+
+            _, _, _, depth, extras_depth = render(
+                H, W, focal, chunk=args.chunk, rays=batch_rays_depth,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
             # Compute MSE loss between predicted and true RGB.
             img_loss = img2mse(rgb, target_s)
+            img_depth_loss = img2mse(depth, target_depth)
+            
             trans = extras['raw'][..., -1]
             loss = img_loss
             psnr = mse2psnr(img_loss)
