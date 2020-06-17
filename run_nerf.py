@@ -853,14 +853,21 @@ def train():
             img_depth_loss = img2mse(depth, target_depth_s)
 
             trans = extras['raw'][..., -1]
-            loss = img_loss
-            psnr = mse2psnr(img_loss)
+            # loss = img_loss
+            loss = img_loss + img_depth_loss
+            # psnr = mse2psnr(img_loss)
+            psnr = mse2psnr(loss)
 
             # Add MSE loss for coarse-grained model
             if 'rgb0' in extras:
                 img_loss0 = img2mse(extras['rgb0'], target_s)
                 loss += img_loss0
                 psnr0 = mse2psnr(img_loss0)
+            
+            if 'depth0' in extras_depth:
+                img_depth_loss0 = img2mse(extras['depth0'], target_depth_s)
+                loss += img_depth_loss0
+                psnr0 = mse2psnr(img_depth_loss0)
 
         gradients = tape.gradient(loss, grad_vars)
         optimizer.apply_gradients(zip(gradients, grad_vars))
