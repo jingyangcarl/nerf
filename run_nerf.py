@@ -849,8 +849,8 @@ def train():
 
             # Compute MSE loss between predicted and true RGB.
             img_loss = img2mse(rgb, target_s)
-            img_depth_loss = img2mse(depth, target_depth)
-            
+            img_depth_loss = img2mse(depth, target_depth_s)
+
             trans = extras['raw'][..., -1]
             loss = img_loss
             psnr = mse2psnr(img_loss)
