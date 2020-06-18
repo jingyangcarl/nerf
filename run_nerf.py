@@ -830,7 +830,7 @@ def train():
                 rays_depth_d = tf.gather_nd(rays_depth_d, select_inds) ## depth
                 batch_rays_depth = tf.stack([rays_depth_o, rays_depth_d], 0) ## depth
                 target_depth_s = tf.gather_nd(target_depth, select_inds) ## depth
-                target_depth_s = 2.0 * tf.reduce_mean(target_depth_s, 1) + 0.5 ## depeth
+                # target_depth_s = 2.0 * tf.reduce_mean(target_depth_s, 1) + 0.5 ## depeth
 
         #####  Core optimization loop  #####
 
