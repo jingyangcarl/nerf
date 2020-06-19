@@ -81,13 +81,14 @@ def load_blender_data(basedir, half_res=False, testskip=1, use_depth=False):
             if 'depth' in s:
                 fname = os.path.join(basedir, frame['file_path'] + '.exr')
                 img = imageio.imread(fname)
-                # TODO: add another channel to exr image
             else:
                 fname = os.path.join(basedir, frame['file_path'] + '.png')
                 img = imageio.imread(fname)
+                img = (img / 255.).astype(np.float32) # keep all 4 channels (RGBA)
             imgs.append(img)
             poses.append(np.array(frame['transform_matrix']))
-        imgs = (np.array(imgs) / 255.).astype(np.float32) # keep all 4 channels (RGBA)
+        # imgs = (np.array(imgs) / 255.).astype(np.float32) # keep all 4 channels (RGBA)
+        imgs = (np.array(imgs)).astype(np.float32) # keep all 4 channels (RGBA)
         poses = np.array(poses).astype(np.float32)
         counts.append(counts[-1] + imgs.shape[0])
         all_imgs.append(imgs)

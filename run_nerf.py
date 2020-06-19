@@ -159,7 +159,7 @@ def render_rays(ray_batch,
         # To composite onto a white background, use the accumulated alpha map.
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[..., None])
-            depth_map = depth_map + (1.-acc_map[..., None])
+            depth_map = depth_map + (1.-acc_map)
 
         return rgb_map, disp_map, acc_map, weights, depth_map
 
@@ -831,8 +831,8 @@ def train():
                 rays_depth_d = tf.gather_nd(rays_depth_d, select_inds) ## depth
                 batch_rays_depth = tf.stack([rays_depth_o, rays_depth_d], 0) ## depth
                 target_depth_s = tf.gather_nd(target_depth, select_inds) ## depth
-                # target_depth_s = 2.0 * tf.reduce_mean(target_depth_s, 1) + 0.5 ## depeth
-                target_depth_s = tf.reduce_mean(target_depth_s, 1) ## depeth
+                target_depth_s = 2.0 * tf.reduce_mean(target_depth_s, 1) + 0.5 ## depeth
+                # target_depth_s = tf.reduce_mean(target_depth_s, 1) ## depeth
 
         #####  Core optimization loop  #####
 
@@ -959,7 +959,7 @@ def train():
                 if i==0:
                     os.makedirs(testimgdir, exist_ok=True)
                 imageio.imwrite(os.path.join(testimgdir, 'rgb{:06d}.png'.format(i)), to8b(rgb))
-                imageio.imwrite(os.path.join(testimgdir, 'depth{:06d}.png'.format(i)), to8b(depth))
+                imageio.imwrite(os.path.join(testimgdir, 'depth{:06d}.png'.format(i)), to8b((depth - 0.5)/2.))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 
