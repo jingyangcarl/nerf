@@ -841,6 +841,7 @@ def train():
             # rgb, disp, acc, extras = render(
             #     H, W, focal, chunk=args.chunk, rays=batch_rays,
             #     verbose=i < 10, retraw=True, **render_kwargs_train)
+
             rgb, disp, acc, _, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
@@ -855,7 +856,8 @@ def train():
 
             trans = extras['raw'][..., -1]
             # loss = img_loss
-            loss = img_loss + img_depth_loss
+            loss = img_depth_loss
+            # loss = img_loss + img_depth_loss
             # psnr = mse2psnr(img_loss)
             psnr = mse2psnr(loss)
 
