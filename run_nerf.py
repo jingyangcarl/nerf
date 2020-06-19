@@ -159,6 +159,7 @@ def render_rays(ray_batch,
         # To composite onto a white background, use the accumulated alpha map.
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[..., None])
+            depth_map = depth_map + (1.-acc_map[..., None])
 
         return rgb_map, disp_map, acc_map, weights, depth_map
 
@@ -797,7 +798,7 @@ def train():
             pose = poses[img_i, :3, :4]
 
             # get corresponding depth
-            img_depth_i = len(i_train) + len(i_test) + len(i_val) ## depth
+            img_depth_i = len(i_train) + len(i_test) + len(i_val) + img_i ## depth
             target_depth = images[img_depth_i] ## depth
             pose_depth = poses[img_depth_i, :3, :4] ## depth
 
@@ -938,9 +939,17 @@ def train():
                 target = images[img_i]
                 pose = poses[img_i, :3, :4]
 
+                # get corresponding depth
+                img_depth_i = len(i_train) + len(i_test) + len(i_val) + img_i ## depth
+                target_depth = images[img_depth_i] ## depth
+                pose_depth = poses[img_depth_i, :3, :4] ## depth
+
                 # rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
                 #                                 **render_kwargs_test)
-                rgb, disp, acc, depth, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
+                rgb, disp, acc, _, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
+                                **render_kwargs_test)
+
+                _, _, _, depth, extras_depth = render(H, W, focal, chunk=args.chunk, c2w=pose_depth,
                                 **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
@@ -949,7 +958,8 @@ def train():
                 testimgdir = os.path.join(basedir, expname, 'tboard_val_imgs')
                 if i==0:
                     os.makedirs(testimgdir, exist_ok=True)
-                imageio.imwrite(os.path.join(testimgdir, '{:06d}.png'.format(i)), to8b(rgb))
+                imageio.imwrite(os.path.join(testimgdir, 'rgb{:06d}.png'.format(i)), to8b(rgb))
+                imageio.imwrite(os.path.join(testimgdir, 'depth{:06d}.png'.format(i)), to8b(depth))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 
