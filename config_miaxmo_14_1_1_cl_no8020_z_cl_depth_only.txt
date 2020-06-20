@@ -17,6 +17,6 @@ N_rand = 1024
 
 testskip = 1
 
-lrate = 1e-4
+lrate = 7e-5
 
 use_depth = True
