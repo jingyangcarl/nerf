@@ -52,7 +52,7 @@ def pose_spherical_(theta, phi, radius, height):
 
 
 # def load_blender_data(basedir, half_res=False, testskip=1):
-def load_blender_data(basedir, half_res=False, testskip=1, use_depth=False):
+def load_blender_data(basedir, half_res=False, testskip=1, use_depth=False, white_bkgd=True):
     # splits = ['train', 'val', 'test']
     if use_depth:
         splits = ['train', 'val', 'test', 'depth_l_train', 'depth_l_val', 'depth_l_test']
@@ -81,10 +81,18 @@ def load_blender_data(basedir, half_res=False, testskip=1, use_depth=False):
             if 'depth' in s:
                 fname = os.path.join(basedir, frame['file_path'] + '.exr')
                 img = imageio.imread(fname)
+                if white_bkgd:
+                    img = img[..., :3] * img[..., -1:]
+                else:
+                    img = img[..., :3]
             else:
                 fname = os.path.join(basedir, frame['file_path'] + '.png')
                 img = imageio.imread(fname)
                 img = (img / 255.).astype(np.float32) # keep all 4 channels (RGBA)
+                if white_bkgd:
+                    img = img[..., :3] * img[..., -1:] + (1. - img[..., -1:])
+                else:
+                    img = img[..., :3]
             imgs.append(img)
             poses.append(np.array(frame['transform_matrix']))
         # imgs = (np.array(imgs) / 255.).astype(np.float32) # keep all 4 channels (RGBA)

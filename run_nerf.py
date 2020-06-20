@@ -623,8 +623,10 @@ def train():
         print('NEAR FAR', near, far)
 
     elif args.dataset_type == 'blender':
+        # images, poses, render_poses, hwf, i_split = load_blender_data(
+        #     args.datadir, args.half_res, args.testskip, args.use_depth)
         images, poses, render_poses, hwf, i_split = load_blender_data(
-            args.datadir, args.half_res, args.testskip, args.use_depth)
+            args.datadir, args.half_res, args.testskip, args.use_depth, args.white_bkgd)
         print('Loaded blender', images.shape,
               render_poses.shape, hwf, args.datadir)
         # i_train, i_val, i_test = i_split
@@ -635,10 +637,10 @@ def train():
         near = 0.5
         far = 2.5
 
-        if args.white_bkgd:
-            images = images[..., :3]*images[..., -1:] + (1.-images[..., -1:])
-        else:
-            images = images[..., :3]
+        # if args.white_bkgd:
+        #     images = images[..., :3]*images[..., -1:] + (1.-images[..., -1:])
+        # else:
+        #     images = images[..., :3]
 
     elif args.dataset_type == 'deepvoxels':
 
