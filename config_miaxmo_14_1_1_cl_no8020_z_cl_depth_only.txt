@@ -11,12 +11,12 @@ N_importance = 64
 
 use_viewdirs = True
 
-white_bkgd = True
+white_bkgd = False
 
 N_rand = 1024
 
 testskip = 1
 
-lrate = 7e-5
+lrate = 2e-5
 
 use_depth = True

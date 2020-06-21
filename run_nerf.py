@@ -859,8 +859,8 @@ def train():
 
             trans = extras['raw'][..., -1]
             # loss = img_loss
-            loss = img_depth_loss
-            # loss = img_loss + img_depth_loss
+            # loss = img_depth_loss
+            loss = img_loss + img_depth_loss
             # psnr = mse2psnr(img_loss)
             psnr = mse2psnr(loss)
 
