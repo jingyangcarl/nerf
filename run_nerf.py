@@ -146,15 +146,15 @@ def render_rays(ray_batch,
         rgb_map = tf.reduce_sum(
             weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
 
+        # map z-value to 0-1 // hear is 0.5 and far is 2.0
+        z_vals = (z_vals - 0.5) / 2.0
+
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
 
         # Disparity map is inverse depth.
         disp_map = 1./tf.maximum(1e-10, depth_map /
                                  tf.reduce_sum(weights, axis=-1))
-
-        # map depth_map to 0-1
-        depth_map = depth_map - 0.5 / 2.0
 
         # Sum of weights along each ray. This value is in [0, 1] up to numerical error.
         acc_map = tf.reduce_sum(weights, -1)
@@ -836,8 +836,8 @@ def train():
                 rays_depth_d = tf.gather_nd(rays_depth_d, select_inds) ## depth
                 batch_rays_depth = tf.stack([rays_depth_o, rays_depth_d], 0) ## depth
                 target_depth_s = tf.gather_nd(target_depth, select_inds) ## depth
-                target_depth_s = 2.0 * tf.reduce_mean(target_depth_s, 1) + 0.5 ## depeth
-                # target_depth_s = tf.reduce_mean(target_depth_s, 1) ## depeth
+                # target_depth_s = 2.0 * tf.reduce_mean(target_depth_s, 1) + 0.5 ## depeth
+                target_depth_s = tf.reduce_mean(target_depth_s, 1) ## depeth
 
         #####  Core optimization loop  #####
 
@@ -862,8 +862,8 @@ def train():
 
             trans = extras['raw'][..., -1]
             # loss = img_loss
-            # loss = img_depth_loss
-            loss = img_loss + img_depth_loss
+            loss = img_depth_loss
+            # loss = img_loss + img_depth_loss
             # psnr = mse2psnr(img_loss)
             psnr = mse2psnr(loss)
 
@@ -964,7 +964,7 @@ def train():
                 if i==0:
                     os.makedirs(testimgdir, exist_ok=True)
                 imageio.imwrite(os.path.join(testimgdir, 'rgb{:06d}.png'.format(i)), to8b(rgb))
-                imageio.imwrite(os.path.join(testimgdir, 'depth{:06d}.png'.format(i)), to8b((depth - 0.5)/2.))
+                imageio.imwrite(os.path.join(testimgdir, 'depth{:06d}.png'.format(i)), to8b(depth))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 

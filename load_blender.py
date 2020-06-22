@@ -81,8 +81,9 @@ def load_blender_data(basedir, half_res=False, testskip=1, use_depth=False, whit
             if 'depth' in s:
                 fname = os.path.join(basedir, frame['file_path'] + '.exr')
                 img = imageio.imread(fname)
+                img = np.clip(img, a_min=0.0, a_max= 1.0) # clip out noise
                 if white_bkgd:
-                    img = img[..., :3] * img[..., -1:]
+                    img = img[..., :3] * img[..., -1:] + (1. - img[..., -1:])
                 else:
                     img = img[..., :3]
             else:
