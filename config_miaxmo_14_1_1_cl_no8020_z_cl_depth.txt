@@ -11,7 +11,7 @@ N_importance = 64
 
 use_viewdirs = True
 
-white_bkgd = False
+white_bkgd = True
 
 N_rand = 1024
 
