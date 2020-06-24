@@ -1,6 +1,6 @@
-expname = miaxmo_14_1_1_cl_no8020_z_test
+expname = miaxmo_14_1_1_cl_no8020_z_cl_depth_nonlinear_test
 basedir = ./logs
-datadir = ./data/nerf_synthetic/miaxmo_14_1_1_cl_no8020_z
+datadir = ./data/nerf_synthetic/miaxmo_14_1_1_cl_no8020_z_cl_depth_nonlinear
 dataset_type = blender
 
 half_res = False
@@ -20,3 +20,5 @@ testskip = 1
 lrate = 1e-4
 
 use_depth = True
+
+lindisp = True
