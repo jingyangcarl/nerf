@@ -848,33 +848,35 @@ def train():
             #     H, W, focal, chunk=args.chunk, rays=batch_rays,
             #     verbose=i < 10, retraw=True, **render_kwargs_train)
 
-            rgb, disp, acc, _, extras = render(
-                H, W, focal, chunk=args.chunk, rays=batch_rays,
-                verbose=i < 10, retraw=True, **render_kwargs_train)
+            # rgb, disp, acc, _, extras = render(
+            #     H, W, focal, chunk=args.chunk, rays=batch_rays,
+            #     verbose=i < 10, retraw=True, **render_kwargs_train)
 
             _, _, _, depth, extras_depth = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays_depth,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
             # Compute MSE loss between predicted and true RGB.
-            img_loss = img2mse(rgb, target_s)
+            # img_loss = img2mse(rgb, target_s)
             img_depth_loss = img2mse(depth, target_depth_s)
 
-            trans = extras['raw'][..., -1]
+            # trans = extras['raw'][..., -1]
+            trans = extras_depth['raw'][..., -1]
             # loss = img_loss
-            # loss = img_depth_loss
-            loss = img_loss + img_depth_loss
+            loss = img_depth_loss
+            # loss = img_loss + img_depth_loss
             # psnr = mse2psnr(img_loss)
             psnr = mse2psnr(loss)
 
-            # Add MSE loss for coarse-grained model
-            if 'rgb0' in extras:
-                img_loss0 = img2mse(extras['rgb0'], target_s)
-                loss += img_loss0
-                psnr0 = mse2psnr(img_loss0)
+            # Add MSE loss 
+            # for coarse-grained model
+            # if 'rgb0' in extras:
+            #     img_loss0 = img2mse(extras['rgb0'], target_s)
+            #     loss += img_loss0
+            #     psnr0 = mse2psnr(img_loss0)
             
             if 'depth0' in extras_depth:
-                img_depth_loss0 = img2mse(extras['depth0'], target_depth_s)
+                img_depth_loss0 = img2mse(extras_depth['depth0'], target_depth_s)
                 loss += img_depth_loss0
                 psnr0 = mse2psnr(img_depth_loss0)
 
