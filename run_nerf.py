@@ -122,8 +122,13 @@ def render_rays(ray_batch,
         # to convert to real world distance (accounts for non-unit directions).
         dists = dists * tf.linalg.norm(rays_d[..., None, :], axis=-1)
 
-        # Extract RGB of each sample position along each ray.
-        rgb = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+        # Extract albedo of each sample position along each ray.
+        albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+
+        # Extract sphereical harmoncis coefficients
+        sh_coef = raw[..., -4:] # [N_rays, N_samples, 3]
+
+        rgb = albedo  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to 
         # regularize network during training (prevents floater artifacts).
