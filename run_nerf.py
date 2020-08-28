@@ -203,7 +203,7 @@ def render_rays(ray_batch,
         z_vals[..., :, None]  # [N_rays, N_samples, 3]
 
     # Evaluate model at each point.
-    raw = network_query_fn(pts, viewdirs, network_fn)  # [N_rays, N_samples, 4]
+    raw = network_query_fn(pts, viewdirs, network_fn)  # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
     rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(
         raw, z_vals, rays_d)
 
@@ -385,7 +385,8 @@ def create_nerf(args):
     if args.use_viewdirs:
         embeddirs_fn, input_ch_views = get_embedder(
             args.multires_views, args.i_embed)
-    output_ch = 4
+    # output_ch = 4 # r, g, b, sigma
+    output_ch = 8 # r, g, b, sigma, s00, s10, s11, s12
     skips = [4]
     model = init_nerf_model(
         D=args.netdepth, W=args.netwidth,
