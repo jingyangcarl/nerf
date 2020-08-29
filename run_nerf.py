@@ -132,10 +132,17 @@ def render_rays(ray_batch,
         sh_coef_b = sh_coef[..., -4:]
 
         # Get spherical harmonics normals
-        sh_norm = -rays_d / tf.linalg.norm(rays_d, axis=-1, keepdims=True)
-        sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[:2] + [3])
+        sh_norm = -rays_d / tf.linalg.norm(rays_d, axis=-1, keepdims=True) # normalizatio
+        sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[:2] + [3]) # [N_rays, 3] -> [N_rays, N_sample, 3]
+        sh_norm = tf.concat([tf.broadcast_to([1.0], sh_norm[..., :1].shape), sh_norm], axis = -1) # computation convenience
 
-        rgb = albedo  # [N_rays, N_samples, 3]
+        # Get spherical harmonics lighting
+        sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm), axis=2) # [N_rays, N_samples]
+        sh_g = tf.reduce_sum(tf.multiply(sh_coef_g, sh_norm), axis=2)
+        sh_b = tf.reduce_sum(tf.multiply(sh_coef_b, sh_norm), axis=2)
+        sh_rgb = tf.stack([sh_r, sh_g, sh_b], axis = -1) # [N_rays, N_samples, 3]
+
+        rgb = albedo + sh_rgb  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to 
         # regularize network during training (prevents floater artifacts).
