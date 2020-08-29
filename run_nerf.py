@@ -126,7 +126,10 @@ def render_rays(ray_batch,
         albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
 
         # Extract sphereical harmoncis coefficients
-        sh_coef = raw[..., -4:] # [N_rays, N_samples, 3]
+        sh_coef = raw[..., -12:] # [N_rays, N_samples, 12]
+        sh_coef_r = sh_coef[..., :4]
+        sh_coef_g = sh_coef[..., 4:-4]
+        sh_coef_b = sh_coef[..., -4:]
 
         # Get spherical harmonics normals
         sh_norm = -rays_d / tf.linalg.norm(rays_d, axis=-1, keepdims=True)
