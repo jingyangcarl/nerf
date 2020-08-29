@@ -126,9 +126,20 @@ def render_rays(ray_batch,
 
         # Extract sphereical harmoncis coefficients
         sh_coef = raw[..., -12:]  # [N_rays, N_samples, 12]
-        sh_coef_r = sh_coef[..., :4]
-        sh_coef_g = sh_coef[..., 4:-4]
-        sh_coef_b = sh_coef[..., -4:]
+        sh_parm = [
+            1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
+            np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
+            np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
+            np.sqrt(3.0 / (4.0 * np.pi))  # l = 1; m = 1
+        ]
+        sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
+                          :2] + [len(sh_parm)]), tf.float32)
+        # [N_rays, N_samples, 4]
+        sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
+        # [N_rays, N_samples, 4]
+        sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
+        # [N_rays, N_samples, 4]
+        sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
 
         # Get spherical harmonics normals
         sh_norm = -rays_d / \
@@ -136,7 +147,7 @@ def render_rays(ray_batch,
         sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[
                                   :2] + [3])  # [N_rays, 3] -> [N_rays, N_sample, 3]
         sh_norm = tf.concat([tf.broadcast_to(
-            [1.0], sh_norm[..., :1].shape), sh_norm], axis=-1)  # computation convenience
+            [1.0], sh_norm[..., :1].shape), sh_norm], axis=-1)  # [N_rays, N_sample, 3] -> [N_rays, N_sample, 4]
 
         # Get spherical harmonics lighting
         sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm),
@@ -934,7 +945,7 @@ def train():
                 pose = poses[img_i, :3, :4]
 
                 rgb, albedo, sh, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
-                                                        **render_kwargs_test)
+                                                            **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
