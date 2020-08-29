@@ -128,6 +128,10 @@ def render_rays(ray_batch,
         # Extract sphereical harmoncis coefficients
         sh_coef = raw[..., -4:] # [N_rays, N_samples, 3]
 
+        # Get spherical harmonics normals
+        sh_norm = -rays_d / tf.linalg.norm(rays_d, axis=-1, keepdims=True)
+        sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[:2] + [3])
+
         rgb = albedo  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to 
