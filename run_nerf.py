@@ -1,17 +1,16 @@
+from load_blender import load_blender_data
+from load_deepvoxels import load_dv_data
+from load_llff import load_llff_data
+from run_nerf_helpers import *
+import time
+import random
+import json
+import imageio
+import numpy as np
+import tensorflow as tf
+import sys
 import os
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-
-import sys
-import tensorflow as tf
-import numpy as np
-import imageio
-import json
-import random
-import time
-from run_nerf_helpers import *
-from load_llff import load_llff_data
-from load_deepvoxels import load_dv_data
-from load_blender import load_blender_data
 
 
 tf.compat.v1.enable_eager_execution()
@@ -126,25 +125,30 @@ def render_rays(ray_batch,
         albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
 
         # Extract sphereical harmoncis coefficients
-        sh_coef = raw[..., -12:] # [N_rays, N_samples, 12]
+        sh_coef = raw[..., -12:]  # [N_rays, N_samples, 12]
         sh_coef_r = sh_coef[..., :4]
         sh_coef_g = sh_coef[..., 4:-4]
         sh_coef_b = sh_coef[..., -4:]
 
         # Get spherical harmonics normals
-        sh_norm = -rays_d / tf.linalg.norm(rays_d, axis=-1, keepdims=True) # normalizatio
-        sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[:2] + [3]) # [N_rays, 3] -> [N_rays, N_sample, 3]
-        sh_norm = tf.concat([tf.broadcast_to([1.0], sh_norm[..., :1].shape), sh_norm], axis = -1) # computation convenience
+        sh_norm = -rays_d / \
+            tf.linalg.norm(rays_d, axis=-1, keepdims=True)  # normalizatio
+        sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[
+                                  :2] + [3])  # [N_rays, 3] -> [N_rays, N_sample, 3]
+        sh_norm = tf.concat([tf.broadcast_to(
+            [1.0], sh_norm[..., :1].shape), sh_norm], axis=-1)  # computation convenience
 
         # Get spherical harmonics lighting
-        sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm), axis=2) # [N_rays, N_samples]
+        sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm),
+                             axis=2)  # [N_rays, N_samples]
         sh_g = tf.reduce_sum(tf.multiply(sh_coef_g, sh_norm), axis=2)
         sh_b = tf.reduce_sum(tf.multiply(sh_coef_b, sh_norm), axis=2)
-        sh_rgb = tf.stack([sh_r, sh_g, sh_b], axis = -1) # [N_rays, N_samples, 3]
+        sh_rgb = tf.stack([sh_r, sh_g, sh_b], axis=-
+                          1)  # [N_rays, N_samples, 3]
 
         rgb = albedo + sh_rgb  # [N_rays, N_samples, 3]
 
-        # Add noise to model's predictions for density. Can be used to 
+        # Add noise to model's predictions for density. Can be used to
         # regularize network during training (prevents floater artifacts).
         noise = 0.
         if raw_noise_std > 0.:
@@ -165,6 +169,10 @@ def render_rays(ray_batch,
         rgb_map = tf.reduce_sum(
             weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
 
+        # Computed weighted albedo of each sample along each ray.
+        albedo_map = tf.reduce_sum(
+            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
 
@@ -179,7 +187,7 @@ def render_rays(ray_batch,
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[..., None])
 
-        return rgb_map, disp_map, acc_map, weights, depth_map
+        return rgb_map, albedo_map, disp_map, acc_map, weights, depth_map
 
     ###############################
     # batch size
@@ -222,12 +230,13 @@ def render_rays(ray_batch,
         z_vals[..., :, None]  # [N_rays, N_samples, 3]
 
     # Evaluate model at each point.
-    raw = network_query_fn(pts, viewdirs, network_fn)  # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
-    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(
+    # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
+    raw = network_query_fn(pts, viewdirs, network_fn)
+    rgb_map, albedo_map, disp_map, acc_map, weights, depth_map = raw2outputs(
         raw, z_vals, rays_d)
 
     if N_importance > 0:
-        rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
+        rgb_map_0, albedo_0, disp_map_0, acc_map_0 = rgb_map, albedo_map, disp_map, acc_map
 
         # Obtain additional integration times to evaluate based on the weights
         # assigned to colors in the coarse model.
@@ -244,14 +253,16 @@ def render_rays(ray_batch,
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
         raw = network_query_fn(pts, viewdirs, run_fn)
-        rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(
+        rgb_map, albedo_map, disp_map, acc_map, weights, depth_map = raw2outputs(
             raw, z_vals, rays_d)
 
-    ret = {'rgb_map': rgb_map, 'disp_map': disp_map, 'acc_map': acc_map}
+    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map,
+           'disp_map': disp_map, 'acc_map': acc_map}
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
         ret['rgb0'] = rgb_map_0
+        ret['albedo0'] = albedo_0
         ret['disp0'] = disp_map_0
         ret['acc0'] = acc_map_0
         ret['z_std'] = tf.math.reduce_std(z_samples, -1)  # [N_rays]
@@ -349,7 +360,7 @@ def render(H, W, focal,
         k_sh = list(sh[:-1]) + list(all_ret[k].shape[1:])
         all_ret[k] = tf.reshape(all_ret[k], k_sh)
 
-    k_extract = ['rgb_map', 'disp_map', 'acc_map']
+    k_extract = ['rgb_map', 'albedo_map', 'disp_map', 'acc_map']
     ret_list = [all_ret[k] for k in k_extract]
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
@@ -366,15 +377,17 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
         focal = focal/render_factor
 
     rgbs = []
+    albedos = []
     disps = []
 
     t = time.time()
     for i, c2w in enumerate(render_poses):
         print(i, time.time() - t)
         t = time.time()
-        rgb, disp, acc, _ = render(
+        rgb, albedo, disp, acc, _ = render(
             H, W, focal, chunk=chunk, c2w=c2w[:3, :4], **render_kwargs)
         rgbs.append(rgb.numpy())
+        albedos.append(albedo.numpy())
         disps.append(disp.numpy())
         if i == 0:
             print(rgb.shape, disp.shape)
@@ -389,9 +402,10 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
             imageio.imwrite(filename, rgb8)
 
     rgbs = np.stack(rgbs, 0)
+    albedos = np.stack(albedos, 0)
     disps = np.stack(disps, 0)
 
-    return rgbs, disps
+    return rgbs, albedos, disps
 
 
 def create_nerf(args):
@@ -405,7 +419,7 @@ def create_nerf(args):
         embeddirs_fn, input_ch_views = get_embedder(
             args.multires_views, args.i_embed)
     # output_ch = 4 # r, g, b, sigma
-    output_ch = 16 # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12
+    output_ch = 16  # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12
     skips = [4]
     model = init_nerf_model(
         D=args.netdepth, W=args.netwidth,
@@ -517,12 +531,12 @@ def config_parser():
                         help='specific weights npy file to reload for coarse network')
     parser.add_argument("--random_seed", type=int, default=None,
                         help='fix random seed for repeatability')
-    
+
     # pre-crop options
     parser.add_argument("--precrop_iters", type=int, default=0,
                         help='number of steps to train on central crops')
     parser.add_argument("--precrop_frac", type=float,
-                        default=.5, help='fraction of img taken for central crops')    
+                        default=.5, help='fraction of img taken for central crops')
 
     # rendering options
     parser.add_argument("--N_samples", type=int, default=64,
@@ -596,7 +610,7 @@ def train():
 
     parser = config_parser()
     args = parser.parse_args()
-    
+
     if args.random_seed is not None:
         print('Fixing random seed', args.random_seed)
         np.random.seed(args.random_seed)
@@ -805,11 +819,11 @@ def train():
                     dH = int(H//2 * args.precrop_frac)
                     dW = int(W//2 * args.precrop_frac)
                     coords = tf.stack(tf.meshgrid(
-                        tf.range(H//2 - dH, H//2 + dH), 
-                        tf.range(W//2 - dW, W//2 + dW), 
+                        tf.range(H//2 - dH, H//2 + dH),
+                        tf.range(W//2 - dW, W//2 + dW),
                         indexing='ij'), -1)
                     if i < 10:
-                        print('precrop', dH, dW, coords[0,0], coords[-1,-1])
+                        print('precrop', dH, dW, coords[0, 0], coords[-1, -1])
                 else:
                     coords = tf.stack(tf.meshgrid(
                         tf.range(H), tf.range(W), indexing='ij'), -1)
@@ -827,7 +841,7 @@ def train():
         with tf.GradientTape() as tape:
 
             # Make predictions for color, disparity, accumulated opacity.
-            rgb, disp, acc, extras = render(
+            rgb, albedo, disp, acc, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
@@ -864,19 +878,22 @@ def train():
 
         if i % args.i_video == 0 and i > 0:
 
-            rgbs, disps = render_path(
+            rgbs, albedos, _ = render_path(
                 render_poses, hwf, args.chunk, render_kwargs_test)
-            print('Done, saving', rgbs.shape, disps.shape)
+            # print('Done, saving', rgbs.shape, disps.shape)
+            print('Done, saving', rgbs.shape, albedos.shape)
             moviebase = os.path.join(
                 basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             imageio.mimwrite(moviebase + 'rgb.mp4',
                              to8b(rgbs), fps=30, quality=8)
+            # imageio.mimwrite(moviebase + 'disp.mp4',
+            #                  to8b(disps / np.max(disps)), fps=30, quality=8)
             imageio.mimwrite(moviebase + 'disp.mp4',
-                             to8b(disps / np.max(disps)), fps=30, quality=8)
+                             to8b(albedos), fps=30, quality=8)
 
             if args.use_viewdirs:
                 render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
-                rgbs_still, _ = render_path(
+                rgbs_still, _, _ = render_path(
                     render_poses, hwf, args.chunk, render_kwargs_test)
                 render_kwargs_test['c2w_staticcam'] = None
                 imageio.mimwrite(moviebase + 'rgb_still.mp4',
@@ -909,16 +926,17 @@ def train():
                 target = images[img_i]
                 pose = poses[img_i, :3, :4]
 
-                rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
-                                                **render_kwargs_test)
+                rgb, albedo, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
+                                                        **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
-                
+
                 # Save out the validation image for Tensorboard-free monitoring
                 testimgdir = os.path.join(basedir, expname, 'tboard_val_imgs')
-                if i==0:
+                if i == 0:
                     os.makedirs(testimgdir, exist_ok=True)
-                imageio.imwrite(os.path.join(testimgdir, '{:06d}.png'.format(i)), to8b(rgb))
+                imageio.imwrite(os.path.join(
+                    testimgdir, '{:06d}.png'.format(i)), to8b(rgb))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 
