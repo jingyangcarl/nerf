@@ -101,7 +101,7 @@ def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips
 
     if use_viewdirs:
         alpha_out = dense(1, act=None)(outputs)
-        sh_out = dense(4, act=None)(outputs) # used for output spherical harmonics coefficients
+        sh_out = dense(12, act=None)(outputs) # used for output spherical harmonics coefficients
         bottleneck = dense(256, act=None)(outputs)
         inputs_viewdirs = tf.concat(
             [bottleneck, inputs_views], -1)  # concat viewdirs

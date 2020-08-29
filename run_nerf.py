@@ -395,7 +395,7 @@ def create_nerf(args):
         embeddirs_fn, input_ch_views = get_embedder(
             args.multires_views, args.i_embed)
     # output_ch = 4 # r, g, b, sigma
-    output_ch = 8 # r, g, b, sigma, s00, s10, s11, s12
+    output_ch = 16 # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12
     skips = [4]
     model = init_nerf_model(
         D=args.netdepth, W=args.netwidth,
