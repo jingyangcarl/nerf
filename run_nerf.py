@@ -937,6 +937,8 @@ def train():
                     os.makedirs(testimgdir, exist_ok=True)
                 imageio.imwrite(os.path.join(
                     testimgdir, '{:06d}.png'.format(i)), to8b(rgb))
+                imageio.imwrite(os.path.join(
+                    testimgdir, '{:06d}_albedo.png'.format(i)), to8b(albedo))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 
