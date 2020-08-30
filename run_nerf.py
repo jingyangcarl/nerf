@@ -907,7 +907,7 @@ def train():
             imageio.mimwrite(moviebase + 'albedo.mp4',
                              to8b(albedos), fps=30, quality=8)
             imageio.mimwrite(moviebase + 'sh.mp4',
-                             to8b(albedos), fps=30, quality=8)
+                             to8b(shs), fps=30, quality=8)
 
             if args.use_viewdirs:
                 render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
