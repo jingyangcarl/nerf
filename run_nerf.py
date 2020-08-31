@@ -143,7 +143,7 @@ def render_rays(ray_batch,
 
         # Get spherical harmonics normals
         sh_norm = -rays_d / \
-            tf.linalg.norm(rays_d, axis=-1, keepdims=True)  # normalizatio
+            tf.linalg.norm(rays_d, axis=-1, keepdims=True)  # normalization
         sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[
                                   :2] + [3])  # [N_rays, 3] -> [N_rays, N_sample, 3]
         sh_norm = tf.concat([tf.broadcast_to(
@@ -157,7 +157,8 @@ def render_rays(ray_batch,
         sh = tf.stack([sh_r, sh_g, sh_b], axis=-
                       1)  # [N_rays, N_samples, 3]
 
-        rgb = albedo + sh  # [N_rays, N_samples, 3]
+        # rgb = albedo + sh  # [N_rays, N_samples, 3]
+        rgb = tf.multiply(albedh, sh)  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to
         # regularize network during training (prevents floater artifacts).
