@@ -158,7 +158,7 @@ def render_rays(ray_batch,
                       1)  # [N_rays, N_samples, 3]
 
         # rgb = albedo + sh  # [N_rays, N_samples, 3]
-        rgb = tf.multiply(albedh, sh)  # [N_rays, N_samples, 3]
+        rgb = tf.multiply(albedo, sh)  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to
         # regularize network during training (prevents floater artifacts).
