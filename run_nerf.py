@@ -126,6 +126,7 @@ def render_rays(ray_batch,
 
         # Extract sphereical harmoncis coefficients
         sh_coef = raw[..., -12:]  # [N_rays, N_samples, 12]
+
         sh_parm = [
             1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
             np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
@@ -137,9 +138,11 @@ def render_rays(ray_batch,
         # [N_rays, N_samples, 4]
         sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
+        # sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
+        sh_coef_g = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
+        # sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
+        sh_coef_b = tf.multiply(sh_coef[..., :4], sh_parm)
 
         # Get spherical harmonics normals
         sh_norm = -rays_d / \
