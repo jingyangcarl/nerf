@@ -1,6 +1,6 @@
-expname = hotdog_test
+expname = materials_test
 basedir = ./logs
-datadir = ./data/nerf_synthetic/hotdog
+datadir = ./data/nerf_synthetic/materials
 dataset_type = blender
 
 half_res = True
@@ -15,4 +15,4 @@ white_bkgd = True
 
 N_rand = 1024
 
-lrate = 1e-3
+lrate = 3.3e-3
