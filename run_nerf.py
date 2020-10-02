@@ -55,7 +55,20 @@ def render_rays(ray_batch,
                 network_fine=None,
                 white_bkgd=False,
                 raw_noise_std=0.,
-                verbose=False):
+
+                network_fn_=None,
+                network_query_fn_=None,
+                N_samples_=None,
+                retraw_=None,
+                lindisp_=None,
+                perturb_=None,
+                N_importance_=None,
+                network_fine_=None,
+                white_bkgd_=None,
+                raw_noise_std_=None,
+
+                verbose=False
+                ):
     """Volumetric rendering.
 
     Args:
@@ -89,7 +102,7 @@ def render_rays(ray_batch,
         sample.
     """
 
-    def raw2outputs(raw, z_vals, rays_d):
+    def raw2outputs(raw, z_vals, rays_d, raw_=None):
         """Transforms model's predictions to semantically meaningful values.
 
         Args:
@@ -125,7 +138,10 @@ def render_rays(ray_batch,
         albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
 
         # Extract sphereical harmoncis coefficients
-        sh_coef = raw[..., -12:]  # [N_rays, N_samples, 12]
+        if raw_ is not None:
+            sh_coef = raw_[..., -12:]
+        else:
+            sh_coef = raw[..., -12:]  # [N_rays, N_samples, 12]
 
         sh_parm = [
             1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
@@ -138,11 +154,19 @@ def render_rays(ray_batch,
         # [N_rays, N_samples, 4]
         sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        # sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
-        sh_coef_g = tf.multiply(sh_coef[..., :4], sh_parm)
+        sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
+        # sh_coef_g = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        # sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
-        sh_coef_b = tf.multiply(sh_coef[..., :4], sh_parm)
+        sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
+        # sh_coef_b = tf.multiply(sh_coef[..., :4], sh_parm)
+        sh_coef_out = tf.stack([sh_coef_r, sh_coef_g, sh_coef_b], axis=-1)
+        # [N_rays, N_samples, 4, 3]
+
+        # for sunrise.exr the spherical harmonics coefficients for level 1 is
+        # [0]	{v=0x00000183ac723988 {0.719291210, 0.780129194, 0.745780885} }	QVector3D
+        # [1]	{v=0x00000183ac723994 {-0.0347954370, -0.0391526185, -0.00687278993} }	QVector3D
+        # [2]	{v=0x00000183ac7239a0 {0.126413971, 0.103076041, 0.0546571091} }	QVector3D
+        # [3]	{v=0x00000183ac7239ac {-0.0953400061, -0.0732670426, -0.0373421051} }	QVector3D
 
         # Get spherical harmonics normals
         sh_norm = -rays_d / \
@@ -188,6 +212,8 @@ def render_rays(ray_batch,
         albedo_map = tf.reduce_sum(
             weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
         sh_map = tf.reduce_sum(weights[..., None] * sh, axis=-2)  # [N_rays, 3]
+        sh_coef_out = tf.reduce_sum(
+            weights[..., None, None] * sh_coef_out, axis=-3)  # [N_ray, 4, 3]
 
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
@@ -203,7 +229,7 @@ def render_rays(ray_batch,
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[..., None])
 
-        return rgb_map, albedo_map, sh_map, disp_map, acc_map, weights, depth_map
+        return rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map
 
     ###############################
     # batch size
@@ -248,11 +274,16 @@ def render_rays(ray_batch,
     # Evaluate model at each point.
     # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
     raw = network_query_fn(pts, viewdirs, network_fn)
-    rgb_map, albedo_map, sh_map, disp_map, acc_map, weights, depth_map = raw2outputs(
-        raw, z_vals, rays_d)
+    if network_fn_ is not None:
+        raw_ = network_query_fn_(pts, viewdirs, network_fn_)
+        rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+            raw, z_vals, rays_d, raw_)
+    else:
+        rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+            raw, z_vals, rays_d)
 
     if N_importance > 0:
-        rgb_map_0, albedo_0, sh_0, disp_map_0, acc_map_0 = rgb_map, albedo_map, sh_map, disp_map, acc_map
+        rgb_map_0, albedo_0, sh_0, sh_coef_0, disp_map_0, acc_map_0 = rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map
 
         # Obtain additional integration times to evaluate based on the weights
         # assigned to colors in the coarse model.
@@ -269,10 +300,16 @@ def render_rays(ray_batch,
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
         raw = network_query_fn(pts, viewdirs, run_fn)
-        rgb_map, albedo_map, sh_map, disp_map, acc_map, weights, depth_map = raw2outputs(
-            raw, z_vals, rays_d)
+        if network_fn_ is not None:
+            run_fn_ = network_fn_ if network_fine_ is None else network_fine_
+            raw_ = network_query_fn_(pts, viewdirs, run_fn_)
+            rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+                raw, z_vals, rays_d, raw_)
+        else:
+            rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+                raw, z_vals, rays_d)
 
-    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map,
+    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'sh_coef_out': sh_coef_out,
            'disp_map': disp_map, 'acc_map': acc_map}
     if retraw:
         ret['raw'] = raw
@@ -280,6 +317,7 @@ def render_rays(ray_batch,
         ret['rgb0'] = rgb_map_0
         ret['albedo0'] = albedo_0
         ret['sh0'] = sh_0
+        ret['sh_coef_0'] = sh_coef_0
         ret['disp0'] = disp_map_0
         ret['acc0'] = acc_map_0
         ret['z_std'] = tf.math.reduce_std(z_samples, -1)  # [N_rays]
@@ -333,7 +371,6 @@ def render(H, W, focal,
       acc_map: [batch_size]. Accumulated opacity (alpha) along a ray.
       extras: dict with everything returned by render_rays().
     """
-
     if c2w is not None:
         # special case to render full image
         rays_o, rays_d = get_rays(H, W, focal, c2w)
@@ -377,7 +414,8 @@ def render(H, W, focal,
         k_sh = list(sh[:-1]) + list(all_ret[k].shape[1:])
         all_ret[k] = tf.reshape(all_ret[k], k_sh)
 
-    k_extract = ['rgb_map', 'albedo_map', 'sh_map', 'disp_map', 'acc_map']
+    k_extract = ['rgb_map', 'albedo_map', 'sh_map',
+                 'sh_coef_out', 'disp_map', 'acc_map']
     ret_list = [all_ret[k] for k in k_extract]
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
@@ -402,7 +440,7 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
     for i, c2w in enumerate(render_poses):
         print(i, time.time() - t)
         t = time.time()
-        rgb, albedo, sh, disp, acc, _ = render(
+        rgb, albedo, sh, _, disp, acc, _ = render(
             H, W, focal, chunk=chunk, c2w=c2w[:3, :4], **render_kwargs)
         rgbs.append(rgb.numpy())
         albedos.append(albedo.numpy())
@@ -861,14 +899,32 @@ def train():
         with tf.GradientTape() as tape:
 
             # Make predictions for color, disparity, accumulated opacity.
-            rgb, albedo, sh, disp, acc, extras = render(
+            rgb, albedo, sh, sh_coef, disp, acc, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
+            # hard code
+            # sh_parm = [
+            #     [0.719291210, -0.0347954370, 0.126413971, -0.0953400061],
+            #     [0.780129194, -0.0391526185, 0.103076041, -0.0732670426],
+            #     [0.745780885, -0.00687278993, 0.0546571091, -0.0373421051]
+            # ]
+
+            sh_parm = [
+                [0.719291210, 0.780129194, 0.745780885],
+                [-0.0347954370, -0.0391526185, -0.00687278993],
+                [0.126413971, 0.103076041, 0.0546571091],
+                [-0.0953400061, -0.0732670426, -0.0373421051]
+            ]  # [4, 3]
+            sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
+                              :1] + [len(sh_parm), len(sh_parm[0])]), tf.float32)
+            # [N_ray, 4, 3]
+
             # Compute MSE loss between predicted and true RGB.
             img_loss = img2mse(rgb, target_s)
+            sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            loss = img_loss
+            loss = img_loss + sh_loss
             psnr = mse2psnr(img_loss)
 
             # Add MSE loss for coarse-grained model
@@ -948,8 +1004,8 @@ def train():
                 target = images[img_i]
                 pose = poses[img_i, :3, :4]
 
-                rgb, albedo, sh, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
-                                                            **render_kwargs_test)
+                rgb, albedo, sh, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
+                                                               **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
