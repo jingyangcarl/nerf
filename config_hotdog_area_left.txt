@@ -1,6 +1,6 @@
-expname = hotdog_area_front_test
+expname = hotdog_area_left_test
 basedir = ./logs
-datadir = ./data/nerf_synthetic/hotdog_area_front
+datadir = ./data/nerf_synthetic/hotdog_area_left
 dataset_type = blender
 
 half_res = True

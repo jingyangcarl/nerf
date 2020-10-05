@@ -1,6 +1,6 @@
-expname = hotdog_test
+expname = hotdog_area_back_test
 basedir = ./logs
-datadir = ./data/nerf_synthetic/hotdog
+datadir = ./data/nerf_synthetic/hotdog_area_back
 dataset_type = blender
 
 half_res = True
@@ -15,4 +15,4 @@ white_bkgd = True
 
 N_rand = 1024
 
-lrate = 1e-3
+lrate = 5e-4
