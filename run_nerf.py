@@ -1,6 +1,7 @@
 from load_blender import load_blender_data
 from load_deepvoxels import load_dv_data
 from load_llff import load_llff_data
+from load_unreal import load_unreal_data
 from run_nerf_helpers import *
 import time
 import random
@@ -26,18 +27,24 @@ def batchify(fn, chunk):
     return ret
 
 
-def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
+def run_network(inputs, input_sh, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
     """Prepares inputs and applies network 'fn'."""
 
     inputs_flat = tf.reshape(inputs, [-1, inputs.shape[-1]])
 
     embedded = embed_fn(inputs_flat)
+
     if viewdirs is not None:
         input_dirs = tf.broadcast_to(viewdirs[:, None], inputs.shape)
         input_dirs_flat = tf.reshape(input_dirs, [-1, input_dirs.shape[-1]])
         embedded_dirs = embeddirs_fn(input_dirs_flat)
         embedded = tf.concat([embedded, embedded_dirs], -1)
 
+    # [NEW]
+    input_sh = input_sh.reshape(-1)
+    input_sh = tf.broadcast_to(input_sh, (embedded.shape[0], input_sh.shape[0]))
+    embedded = tf.concat((embedded, input_sh), -1)
+    
     outputs_flat = batchify(fn, netchunk)(embedded)
     outputs = tf.reshape(outputs_flat, list(
         inputs.shape[:-1]) + [outputs_flat.shape[-1]])
@@ -45,6 +52,7 @@ def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
 
 
 def render_rays(ray_batch,
+                input_sh,
                 network_fn,
                 network_query_fn,
                 N_samples,
@@ -147,7 +155,17 @@ def render_rays(ray_batch,
             1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
             np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
             np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
-            np.sqrt(3.0 / (4.0 * np.pi))  # l = 1; m = 1
+            np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 1
+
+            # Uncomment to consider imaginary part and higher order
+            # np.sqrt(3.0 / (8.0 * np.pi)),  # l = 1; m = -1
+            # np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
+            # -np.sqrt(3.0 / (8.0 * np.pi)),  # l = 1; m = 1
+            # np.sqrt(15 / (32 * np.pi)), # l = 2; m = -2
+            # np.sqrt(15 / (8 * np.pi)), # l = 2; m = -1
+            # np.sqrt(5 / (16 * np.pi)), # l = 2; m = 0
+            # -np.sqrt(15 / (8 * np.pi)), # l = 2; m = 1
+            # -np.sqrt(15 / (32 * np.pi)), # l = 2; m = 2
         ]
         sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
                           :2] + [len(sh_parm)]), tf.float32)
@@ -273,9 +291,9 @@ def render_rays(ray_batch,
 
     # Evaluate model at each point.
     # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
-    raw = network_query_fn(pts, viewdirs, network_fn)
+    raw = network_query_fn(pts, input_sh, viewdirs, network_fn)
     if network_fn_ is not None:
-        raw_ = network_query_fn_(pts, viewdirs, network_fn_)
+        raw_ = network_query_fn_(pts, input_sh, viewdirs, network_fn_)
         rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
             raw, z_vals, rays_d, raw_)
     else:
@@ -299,10 +317,10 @@ def render_rays(ray_batch,
 
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
-        raw = network_query_fn(pts, viewdirs, run_fn)
+        raw = network_query_fn(pts, input_sh, viewdirs, run_fn)
         if network_fn_ is not None:
             run_fn_ = network_fn_ if network_fine_ is None else network_fine_
-            raw_ = network_query_fn_(pts, viewdirs, run_fn_)
+            raw_ = network_query_fn_(pts, input_sh, viewdirs, run_fn_)
             rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
                 raw, z_vals, rays_d, raw_)
         else:
@@ -328,11 +346,11 @@ def render_rays(ray_batch,
     return ret
 
 
-def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
+def batchify_rays(rays_flat, input_sh, chunk=1024*32, **kwargs):
     """Render rays in smaller minibatches to avoid OOM."""
     all_ret = {}
     for i in range(0, rays_flat.shape[0], chunk):
-        ret = render_rays(rays_flat[i:i+chunk], **kwargs)
+        ret = render_rays(rays_flat[i:i+chunk], input_sh, **kwargs)
         for k in ret:
             if k not in all_ret:
                 all_ret[k] = []
@@ -343,7 +361,7 @@ def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
 
 
 def render(H, W, focal,
-           chunk=1024*32, rays=None, c2w=None, ndc=True,
+           chunk=1024*32, rays=None, input_sh=None, c2w=None, ndc=True,
            near=0., far=1.,
            use_viewdirs=False, c2w_staticcam=None,
            **kwargs):
@@ -409,7 +427,7 @@ def render(H, W, focal,
         rays = tf.concat([rays, viewdirs], axis=-1)
 
     # Render and reshape
-    all_ret = batchify_rays(rays, chunk, **kwargs)
+    all_ret = batchify_rays(rays, input_sh, chunk, **kwargs)
     for k in all_ret:
         k_sh = list(sh[:-1]) + list(all_ret[k].shape[1:])
         all_ret[k] = tf.reshape(all_ret[k], k_sh)
@@ -477,12 +495,13 @@ def create_nerf(args):
         embeddirs_fn, input_ch_views = get_embedder(
             args.multires_views, args.i_embed)
     # output_ch = 4 # r, g, b, sigma
-    output_ch = 16  # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12
+    output_ch = 4 + 3 * 4  # r, g, b, sigma, rs (4), gs (4), bs (4)
     skips = [4]
     model = init_nerf_model(
         D=args.netdepth, W=args.netwidth,
         input_ch=input_ch, output_ch=output_ch, skips=skips,
-        input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
+        input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs,
+        input_ch_sh=12)
     grad_vars = model.trainable_variables
     models = {'model': model}
 
@@ -491,12 +510,13 @@ def create_nerf(args):
         model_fine = init_nerf_model(
             D=args.netdepth_fine, W=args.netwidth_fine,
             input_ch=input_ch, output_ch=output_ch, skips=skips,
-            input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
+            input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs,
+            input_ch_sh=12)
         grad_vars += model_fine.trainable_variables
         models['model_fine'] = model_fine
 
-    def network_query_fn(inputs, viewdirs, network_fn): return run_network(
-        inputs, viewdirs, network_fn,
+    def network_query_fn(inputs, input_sh, viewdirs, network_fn): return run_network(
+        inputs, input_sh, viewdirs, network_fn,
         embed_fn=embed_fn,
         embeddirs_fn=embeddirs_fn,
         netchunk=args.netchunk)
@@ -732,6 +752,21 @@ def train():
         hemi_R = np.mean(np.linalg.norm(poses[:, :3, -1], axis=-1))
         near = hemi_R-1.
         far = hemi_R+1.
+    
+    elif args.dataset_type == 'unreal':
+        images, poses, shs_GT, render_poses, hwf, i_split = load_unreal_data(
+            args.datadir, args.half_res, args.testskip)
+        print('Loaded unreal', images.shape,
+              render_poses.shape, hwf, args.datadir)
+        i_train, i_val, i_test = i_split
+
+        near = 2.
+        far = 6.
+
+        if args.white_bkgd:
+            images = images[..., :3]*images[..., -1:] + (1.-images[..., -1:])
+        else:
+            images = images[..., :3]
 
     else:
         print('Unknown dataset type', args.dataset_type, 'exiting')
@@ -805,9 +840,11 @@ def train():
     global_step.assign(start)
 
     # Prepare raybatch tensor if batching random rays
+    # TODO: use_batching is not enabled for SH to now
     N_rand = args.N_rand
     use_batching = not args.no_batching
     if use_batching:
+        print('WARNING: SH is not enabled for use_batching')
         # For random ray batching.
         #
         # Constructs an array 'rays_rgb' of shape [N*H*W, 3, 3] where axis=1 is
@@ -870,6 +907,7 @@ def train():
             img_i = np.random.choice(i_train)
             target = images[img_i]
             pose = poses[img_i, :3, :4]
+            sh_GT = shs_GT[img_i]
 
             if N_rand is not None:
                 rays_o, rays_d = get_rays(H, W, focal, pose)
@@ -900,7 +938,7 @@ def train():
 
             # Make predictions for color, disparity, accumulated opacity.
             rgb, albedo, sh, sh_coef, disp, acc, extras = render(
-                H, W, focal, chunk=args.chunk, rays=batch_rays,
+                H, W, focal, chunk=args.chunk, rays=batch_rays, input_sh=sh_GT,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
             # hard code
@@ -932,12 +970,14 @@ def train():
             #     [0.183451623, 0.183451623, 0.183451623]
             # ] # [4, 3] area_left
 
-            sh_parm = [
-                [0.112468645, 0.112468645, 0.112468645],
-                [0.000387015840, 0.000387015840, 0.000387015840],
-                [-0.000640209531, -0.000640209531, -0.000640209531],
-                [-0.181979418, -0.181979418, -0.181979418]
-            ] # [4, 3] area_right
+            # sh_parm = [
+            #     [0.112468645, 0.112468645, 0.112468645],
+            #     [0.000387015840, 0.000387015840, 0.000387015840],
+            #     [-0.000640209531, -0.000640209531, -0.000640209531],
+            #     [-0.181979418, -0.181979418, -0.181979418]
+            # ] # [4, 3] area_right
+
+            sh_parm = sh_GT.reshape(4, 3)
 
             sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
                               :1] + [len(sh_parm), len(sh_parm[0])]), tf.float32)
@@ -1027,13 +1067,15 @@ def train():
                 target = images[img_i]
                 pose = poses[img_i, :3, :4]
 
-                rgb, albedo, sh, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
+                rgb, albedo, sh, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, input_sh=sh_GT,
                                                                **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
                 # Save out the validation image for Tensorboard-free monitoring
                 testimgdir = os.path.join(basedir, expname, 'tboard_val_imgs')
+                if not os.path.exists(testimgdir):
+                    os.makedirs(testimgdir, exist_ok=True)
                 if i == 0:
                     os.makedirs(testimgdir, exist_ok=True)
                 imageio.imwrite(os.path.join(

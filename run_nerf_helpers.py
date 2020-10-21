@@ -77,31 +77,34 @@ def get_embedder(multires, i=0):
 
 # Model architecture
 
-def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips=[4], use_viewdirs=False):
+def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, input_ch_sh=12, output_ch=4, skips=[4], use_viewdirs=False):
 
     relu = tf.keras.layers.ReLU()
     def dense(W, act=relu): return tf.keras.layers.Dense(W, activation=act)
 
-    print('MODEL', input_ch, input_ch_views, type(
-        input_ch), type(input_ch_views), use_viewdirs)
+    print('MODEL', input_ch, input_ch_views, input_ch_sh, type(
+        input_ch), type(input_ch_views), type(input_ch_sh), use_viewdirs)
     input_ch = int(input_ch)
     input_ch_views = int(input_ch_views)
+    input_ch_sh = int(input_ch_sh)
 
-    inputs = tf.keras.Input(shape=(input_ch + input_ch_views))
-    inputs_pts, inputs_views = tf.split(inputs, [input_ch, input_ch_views], -1)
+    inputs = tf.keras.Input(shape=(input_ch + input_ch_views + input_ch_sh))
+    inputs_pts, inputs_views, input_sh = tf.split(inputs, [input_ch, input_ch_views, input_ch_sh], -1)
     inputs_pts.set_shape([None, input_ch])
     inputs_views.set_shape([None, input_ch_views])
+    input_sh.set_shape([None, input_ch_sh])
 
-    print(inputs.shape, inputs_pts.shape, inputs_views.shape)
-    outputs = inputs_pts
+    # print(inputs.shape, inputs_pts.shape, inputs_views.shape, input_sh.shape)
+    outputs = tf.concat([inputs_pts, input_sh], -1)    # [NEW] Concatenate SH 1
+    # outputs = inputs_pts
     for i in range(D):
         outputs = dense(W)(outputs)
         if i in skips:
-            outputs = tf.concat([inputs_pts, outputs], -1)
+            outputs = tf.concat([inputs_pts, input_sh, outputs], -1)    # [NEW] Concatenate SH 2
 
     if use_viewdirs:
         alpha_out = dense(1, act=None)(outputs)
-        sh_out = dense(12, act=None)(outputs) # used for output spherical harmonics coefficients
+        sh_out = dense(12, act=None)(outputs) # used for output spherical harmonics coefficients    # [NEW] up to 1st order SH
         bottleneck = dense(256, act=None)(outputs)
         inputs_viewdirs = tf.concat(
             [bottleneck, inputs_views], -1)  # concat viewdirs
