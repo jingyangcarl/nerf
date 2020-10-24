@@ -5,12 +5,26 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Python: Lego",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--config", "config_hotdog_red.txt"]
+            "args": [
+                "--config",
+                "config_lego.txt"
+            ]
+        },
+        {
+            "name": "Python: Fern",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "config_fern.txt"
+            ]
         }
     ]
 }

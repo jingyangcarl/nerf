@@ -138,17 +138,46 @@ def render_rays(ray_batch,
         albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
 
         # Extract sphereical harmoncis coefficients
-        if raw_ is not None:
-            sh_coef = raw_[..., -12:]
-        else:
-            sh_coef = raw[..., -12:]  # [N_rays, N_samples, 12]
-
         sh_parm = [
             1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
             np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
             np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
             np.sqrt(3.0 / (4.0 * np.pi))  # l = 1; m = 1
         ]
+
+        if raw_ is not None:
+            # sh_coef = raw_[..., -12:]
+            # sh_coef = [0.112468645, 0.000387015840, -0.000640209531, 0.181979418, 0.112468645, 0.000387015840, -
+            #           0.000640209531, 0.181979418, 0.112468645, 0.000387015840, -0.000640209531, 0.181979418] # area_right
+            # sh_coef = [0.113404416, 0.000178174669, -0.000886920141, 0.183451623, 0.113404416, 0.000178174669, -
+            #            0.000886920141, 0.183451623, 0.113404416, 0.000178174669, -0.000886920141, 0.183451623] # area_left
+            # sh_coef = [0.113704570, -0.000507348042, 0.183912858, -8.44246679e-05, 0.113704570, -0.000507348042,
+            #            0.183912858, -8.44246679e-05, 0.113704570, -0.000507348042, 0.183912858, -8.44246679e-05] # area_front
+            sh_coef = [0.213704570, 0.283912858, -0.000507348042, -8.44246679e-05, 0.213704570, -0.283912858, -
+                       0.000507348042, -8.44246679e-05, 0.213704570, -0.283912858, -0.000507348042, -8.44246679e-05]  # area_front_switch
+            # sh_coef = [0.112574577, 0.000413807342, -0.182193324, 0.000330153387, 0.112574577, 0.000413807342,
+            #            -0.182193324, 0.000330153387, 0.112574577, 0.000413807342, -0.182193324, 0.000330153387] # area_back
+            # sh_coef = [0.719291210, -0.0347954370, 0.126413971, -0.0953400061, 0.780129194, -0.0391526185,
+            #            0.103076041, -0.0732670426, 0.745780885, -0.00687278993, 0.0546571091, -0.0373421051] # sunrise
+            sh_parm = tf.cast(sh_parm, tf.float32)
+            intensity = 8
+            sh_coef[0] = sh_coef[0] / sh_parm[0] * intensity
+            sh_coef[1] = sh_coef[1] / sh_parm[1] * intensity
+            sh_coef[2] = sh_coef[2] / sh_parm[2] * intensity
+            sh_coef[3] = sh_coef[3] / sh_parm[3] * intensity
+            sh_coef[4] = sh_coef[4] / sh_parm[0] * intensity
+            sh_coef[5] = sh_coef[5] / sh_parm[1] * intensity
+            sh_coef[6] = sh_coef[6] / sh_parm[2] * intensity
+            sh_coef[7] = sh_coef[7] / sh_parm[3] * intensity
+            sh_coef[8] = sh_coef[8] / sh_parm[0] * intensity
+            sh_coef[9] = sh_coef[9] / sh_parm[1] * intensity
+            sh_coef[10] = sh_coef[10] / sh_parm[2] * intensity
+            sh_coef[11] = sh_coef[11] / sh_parm[3] * intensity
+            sh_coef = tf.broadcast_to(sh_coef, raw.shape.as_list()[
+                                      :2] + [len(sh_coef)], tf.float32)
+        else:
+            sh_coef = raw[..., -12:]  # [N_rays, N_samples, 12]
+
         sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
                           :2] + [len(sh_parm)]), tf.float32)
         # [N_rays, N_samples, 4]
@@ -371,6 +400,7 @@ def render(H, W, focal,
       acc_map: [batch_size]. Accumulated opacity (alpha) along a ray.
       extras: dict with everything returned by render_rays().
     """
+
     if c2w is not None:
         # special case to render full image
         rays_o, rays_d = get_rays(H, W, focal, c2w)
@@ -904,6 +934,7 @@ def train():
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
             # hard code
+            # the following parameter is using opengl xyz
             # sh_parm = [
             #     [0.719291210, 0.780129194, 0.745780885],
             #     [-0.0347954370, -0.0391526185, -0.00687278993],
@@ -916,7 +947,14 @@ def train():
             #     [-0.000507348042, -0.000507348042, -0.000507348042],
             #     [0.183912858, 0.183912858, 0.183912858],
             #     [-8.44246679e-05, -8.44246679e-05, -8.44246679e-05]
-            # ] # [4, 3] area_front
+            # ]  # [4, 3] area_front
+
+            sh_parm = [
+                [0.113704570, 0.113704570, 0.113704570],
+                [-0.183912858, -0.183912858, -0.183912858],
+                [-0.000507348042, -0.000507348042, -0.000507348042],
+                [-8.44246679e-05, -8.44246679e-05, -8.44246679e-05]
+            ]  # [4, 3] area_front_switch
 
             # sh_parm = [
             #     [0.112574577, 0.112574577, 0.112574577],
@@ -932,12 +970,12 @@ def train():
             #     [0.183451623, 0.183451623, 0.183451623]
             # ] # [4, 3] area_left
 
-            sh_parm = [
-                [0.112468645, 0.112468645, 0.112468645],
-                [0.000387015840, 0.000387015840, 0.000387015840],
-                [-0.000640209531, -0.000640209531, -0.000640209531],
-                [-0.181979418, -0.181979418, -0.181979418]
-            ] # [4, 3] area_right
+            # sh_parm = [
+            #     [0.112468645, 0.112468645, 0.112468645],
+            #     [0.000387015840, 0.000387015840, 0.000387015840],
+            #     [-0.000640209531, -0.000640209531, -0.000640209531],
+            #     [-0.181979418, -0.181979418, -0.181979418]
+            # ]  # [4, 3] area_right
 
             sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
                               :1] + [len(sh_parm), len(sh_parm[0])]), tf.float32)
