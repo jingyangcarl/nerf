@@ -1,6 +1,7 @@
 from load_blender import load_blender_data
 from load_deepvoxels import load_dv_data
 from load_llff import load_llff_data
+from load_lightstage import load_lightstage_data
 from run_nerf_helpers import *
 import time
 import random
@@ -763,14 +764,35 @@ def train():
         near = hemi_R-1.
         far = hemi_R+1.
 
+    elif args.dataset_type == 'lightstage':
+
+        # load data
+        images, poses, render_poses, hwf, i_split = load_lightstage_data(
+            basedir=args.datadir, half_res=args.half_res, testskip=args.testskip)
+        print('Loaded lightstage', images.shape, render_poses.shape, hwf.shape, args.datadir)
+
+        # split traning, test and validation
+        i_train, i_val, i_test = i_split
+
+        # set near and far value, real distance
+        near = 2.
+        far = 6.
+
+        # set white_bkgd if alpha channel is available
+        if args.white_bkgd:
+            pass
+        else:
+            pass
+
+
     else:
         print('Unknown dataset type', args.dataset_type, 'exiting')
         return
 
     # Cast intrinsics to right types
-    H, W, focal = hwf
-    H, W = int(H), int(W)
-    hwf = [H, W, focal]
+    # H, W, focal = hwf
+    # H, W = int(H), int(W)
+    # hwf = [H, W, focal]
 
     if args.render_test:
         render_poses = np.array(poses[i_test])
