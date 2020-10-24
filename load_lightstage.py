@@ -72,7 +72,7 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
 
         # read each frame
         for frame in meta['frames'][::skip]:
-            fname = os.path.join(basedir, frame['file_path'] + '.png')
+            fname = os.path.join(basedir, frame['file_path'])
             imgs.append(imageio.imread(fname))
             poses.append(np.array(frame['transform_matrix']))
             hwf.append(np.array(frame['hwf']))
@@ -110,12 +110,13 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
                              for angle in np.linspace(-180, 180, 40+1)[:-1]], 0)
 
     if half_res:
-        imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
+        # imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
         # H = H//2
         # W = W//2
         # focal = focal/2.
         hwf[:, 0] = hwf[:, 0] // 2  # height
         hwf[:, 1] = hwf[:, 1] // 2  # width
         hwf[:, 2] = hwf[:, 2] / 2  # focal
+        imgs = tf.image.resize_area(imgs, [int(hwf[0,0]), int(hwf[0,1])]).numpy()
 
     return imgs, poses, render_poses, hwf, i_split
