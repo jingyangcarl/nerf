@@ -27,17 +27,24 @@ def batchify(fn, chunk):
     return ret
 
 
-def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
+def run_network(inputs, viewdirs, sh, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
     """Prepares inputs and applies network 'fn'."""
 
     inputs_flat = tf.reshape(inputs, [-1, inputs.shape[-1]])
 
+    # embed view direction
     embedded = embed_fn(inputs_flat)
     if viewdirs is not None:
         input_dirs = tf.broadcast_to(viewdirs[:, None], inputs.shape)
         input_dirs_flat = tf.reshape(input_dirs, [-1, input_dirs.shape[-1]])
         embedded_dirs = embeddirs_fn(input_dirs_flat)
         embedded = tf.concat([embedded, embedded_dirs], -1)
+
+    # embed spherical harmonics
+    if sh is not None:
+        sh = sh.reshape(-1)
+        sh = tf.broadcast_to(sh, (embedded.shape[0], sh.shape[0]))
+        embedded = tf.concat((embedded, sh), -1)
 
     outputs_flat = batchify(fn, netchunk)(embedded)
     outputs = tf.reshape(outputs_flat, list(
@@ -46,6 +53,7 @@ def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
 
 
 def render_rays(ray_batch,
+                sh,
                 network_fn,
                 network_query_fn,
                 N_samples,
@@ -214,7 +222,6 @@ def render_rays(ray_batch,
         sh = tf.stack([sh_r, sh_g, sh_b], axis=-
                       1)  # [N_rays, N_samples, 3]
 
-        # rgb = albedo + sh  # [N_rays, N_samples, 3]
         rgb = tf.multiply(albedo, sh)  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to
@@ -303,9 +310,9 @@ def render_rays(ray_batch,
 
     # Evaluate model at each point.
     # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
-    raw = network_query_fn(pts, viewdirs, network_fn)
+    raw = network_query_fn(pts, viewdirs, sh, network_fn)
     if network_fn_ is not None:
-        raw_ = network_query_fn_(pts, viewdirs, network_fn_)
+        raw_ = network_query_fn_(pts, viewdirs, sh, network_fn_)
         rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
             raw, z_vals, rays_d, raw_)
     else:
@@ -329,10 +336,10 @@ def render_rays(ray_batch,
 
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
-        raw = network_query_fn(pts, viewdirs, run_fn)
+        raw = network_query_fn(pts, viewdirs, sh, run_fn)
         if network_fn_ is not None:
             run_fn_ = network_fn_ if network_fine_ is None else network_fine_
-            raw_ = network_query_fn_(pts, viewdirs, run_fn_)
+            raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
             rgb_map, albedo_map, sh_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
                 raw, z_vals, rays_d, raw_)
         else:
@@ -358,11 +365,11 @@ def render_rays(ray_batch,
     return ret
 
 
-def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
+def batchify_rays(rays_flat, sh, chunk=1024*32, **kwargs):
     """Render rays in smaller minibatches to avoid OOM."""
     all_ret = {}
     for i in range(0, rays_flat.shape[0], chunk):
-        ret = render_rays(rays_flat[i:i+chunk], **kwargs)
+        ret = render_rays(rays_flat[i:i+chunk], sh, **kwargs)
         for k in ret:
             if k not in all_ret:
                 all_ret[k] = []
@@ -374,6 +381,7 @@ def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
 
 def render(H, W, focal,
            chunk=1024*32, rays=None, c2w=None, ndc=True,
+           sh=None,
            near=0., far=1.,
            use_viewdirs=False, c2w_staticcam=None,
            **kwargs):
@@ -421,7 +429,10 @@ def render(H, W, focal,
         viewdirs = viewdirs / tf.linalg.norm(viewdirs, axis=-1, keepdims=True)
         viewdirs = tf.cast(tf.reshape(viewdirs, [-1, 3]), dtype=tf.float32)
 
-    sh = rays_d.shape  # [..., 3]
+    if sh is not None:
+        pass
+
+    shp = rays_d.shape  # [..., 3]
     if ndc:
         # for forward facing scenes
         rays_o, rays_d = ndc_rays(
@@ -440,9 +451,9 @@ def render(H, W, focal,
         rays = tf.concat([rays, viewdirs], axis=-1)
 
     # Render and reshape
-    all_ret = batchify_rays(rays, chunk, **kwargs)
+    all_ret = batchify_rays(rays, sh, chunk, **kwargs)
     for k in all_ret:
-        k_sh = list(sh[:-1]) + list(all_ret[k].shape[1:])
+        k_sh = list(shp[:-1]) + list(all_ret[k].shape[1:])
         all_ret[k] = tf.reshape(all_ret[k], k_sh)
 
     k_extract = ['rgb_map', 'albedo_map', 'sh_map',
@@ -452,30 +463,53 @@ def render(H, W, focal,
     return ret_list + [ret_dict]
 
 
-def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
+def render_path(render_poses, hwfs, shs, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
 
-    H, W, focal = hwf
+    # H, W, focal = hwf
 
-    if render_factor != 0:
-        # Render downsampled for speed
-        H = H//render_factor
-        W = W//render_factor
-        focal = focal/render_factor
+    # if render_factor != 0:
+    #     # Render downsampled for speed
+    #     H = H//render_factor
+    #     W = W//render_factor
+    #     focal = focal/render_factor
 
     rgbs = []
     albedos = []
-    shs = []
+    sh_lights = []
     disps = []
 
     t = time.time()
     for i, c2w in enumerate(render_poses):
+        # timer
         print(i, time.time() - t)
         t = time.time()
-        rgb, albedo, sh, _, disp, acc, _ = render(
-            H, W, focal, chunk=chunk, c2w=c2w[:3, :4], **render_kwargs)
+
+        # prepare spherical harmonics
+        if shs.ndim == 2:
+            sh = shs
+        else:
+            sh = shs[i, :4, :3]
+
+        # prepare hwf
+        if hwfs.ndim == 1:
+            H, W, focal = hwfs
+        else:
+            H, W, focal = hwfs[i]
+        H, W = int(H), int(W)
+        if render_factor != 0:
+            # Render downsampled for speed
+            H = H//render_factor
+            W = W//render_factor
+            focal = focal/render_factor
+
+            # render
+        rgb, albedo, sh_light, _, disp, acc, _ = render(
+            H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
+
+        #
         rgbs.append(rgb.numpy())
         albedos.append(albedo.numpy())
-        shs.append(sh.numpy())
+        sh_lights.append(sh_light.numpy())
         disps.append(disp.numpy())
         if i == 0:
             print(rgb.shape, disp.shape)
@@ -491,29 +525,34 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
 
     rgbs = np.stack(rgbs, 0)
     albedos = np.stack(albedos, 0)
-    shs = np.stack(shs, 0)
+    sh_lights = np.stack(sh_lights, 0)
     disps = np.stack(disps, 0)
 
-    return rgbs, albedos, shs, disps
+    return rgbs, albedos, sh_lights, disps
 
 
 def create_nerf(args):
     """Instantiate NeRF's MLP model."""
 
+    # positional encoding for xyz
     embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
 
+    # positional encoding for view
     input_ch_views = 0
     embeddirs_fn = None
     if args.use_viewdirs:
         embeddirs_fn, input_ch_views = get_embedder(
             args.multires_views, args.i_embed)
-    # output_ch = 4 # r, g, b, sigma
+
+    # for sh, no need for positional encoding
+    input_ch_sh = 12
+
     output_ch = 16  # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12
     skips = [4]
     model = init_nerf_model(
         D=args.netdepth, W=args.netwidth,
         input_ch=input_ch, output_ch=output_ch, skips=skips,
-        input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
+        input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
     grad_vars = model.trainable_variables
     models = {'model': model}
 
@@ -522,12 +561,12 @@ def create_nerf(args):
         model_fine = init_nerf_model(
             D=args.netdepth_fine, W=args.netwidth_fine,
             input_ch=input_ch, output_ch=output_ch, skips=skips,
-            input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs)
+            input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
         grad_vars += model_fine.trainable_variables
         models['model_fine'] = model_fine
 
-    def network_query_fn(inputs, viewdirs, network_fn): return run_network(
-        inputs, viewdirs, network_fn,
+    def network_query_fn(inputs, viewdirs, sh, network_fn): return run_network(
+        inputs, viewdirs, sh, network_fn,
         embed_fn=embed_fn,
         embeddirs_fn=embeddirs_fn,
         netchunk=args.netchunk)
@@ -767,23 +806,23 @@ def train():
     elif args.dataset_type == 'lightstage':
 
         # load data
-        images, poses, render_poses, hwf, i_split = load_lightstage_data(
+        images, poses, hwfs, shs, render_poses, i_split = load_lightstage_data(
             basedir=args.datadir, half_res=args.half_res, testskip=args.testskip)
-        print('Loaded lightstage', images.shape, render_poses.shape, hwf.shape, args.datadir)
+        print('Loaded lightstage', images.shape, poses.shape,
+              hwfs.shape, shs.shape, render_poses.shape, args.datadir)
 
         # split traning, test and validation
         i_train, i_val, i_test = i_split
 
         # set near and far value, real distance
-        near = 2.
-        far = 6.
+        near = 100.
+        far = 400.
 
         # set white_bkgd if alpha channel is available
         if args.white_bkgd:
             pass
         else:
             pass
-
 
     else:
         print('Unknown dataset type', args.dataset_type, 'exiting')
@@ -793,6 +832,13 @@ def train():
     # H, W, focal = hwf
     # H, W = int(H), int(W)
     # hwf = [H, W, focal]
+    hwf_avg = np.average(hwfs, axis=0)
+    sh_default = np.array([
+        [0.719291210, 0.780129194, 0.745780885],
+        [-0.0347954370, -0.0391526185, -0.00687278993],
+        [0.126413971, 0.103076041, 0.0546571091],
+        [-0.0953400061, -0.0732670426, -0.0373421051]
+    ]).astype(np.float32) # [4, 3] sunrise.exr
 
     if args.render_test:
         render_poses = np.array(poses[i_test])
@@ -837,7 +883,7 @@ def train():
         os.makedirs(testsavedir, exist_ok=True)
         print('test poses shape', render_poses.shape)
 
-        rgbs, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test,
+        rgbs, _ = render_path(render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test,
                               gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
         print('Done rendering', testsavedir)
         imageio.mimwrite(os.path.join(testsavedir, 'video.mp4'),
@@ -920,8 +966,13 @@ def train():
         else:
             # Random from one image
             img_i = np.random.choice(i_train)
+
+            # get traning data
             target = images[img_i]
             pose = poses[img_i, :3, :4]
+            sh = shs[img_i, :4, :3]
+            H, W, focal = hwfs[img_i]
+            H, W = int(H), int(W)
 
             if N_rand is not None:
                 rays_o, rays_d = get_rays(H, W, focal, pose)
@@ -951,8 +1002,8 @@ def train():
         with tf.GradientTape() as tape:
 
             # Make predictions for color, disparity, accumulated opacity.
-            rgb, albedo, sh, sh_coef, disp, acc, extras = render(
-                H, W, focal, chunk=args.chunk, rays=batch_rays,
+            rgb, albedo, sh_light, sh_coef, disp, acc, extras = render(
+                H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
             # hard code
@@ -971,12 +1022,12 @@ def train():
             #     [-8.44246679e-05, -8.44246679e-05, -8.44246679e-05]
             # ]  # [4, 3] area_front
 
-            sh_parm = [
-                [0.113704570, 0.113704570, 0.113704570],
-                [-0.183912858, -0.183912858, -0.183912858],
-                [-0.000507348042, -0.000507348042, -0.000507348042],
-                [-8.44246679e-05, -8.44246679e-05, -8.44246679e-05]
-            ]  # [4, 3] area_front_switch
+            # sh_parm = [
+            #     [0.113704570, 0.113704570, 0.113704570],
+            #     [-0.183912858, -0.183912858, -0.183912858],
+            #     [-0.000507348042, -0.000507348042, -0.000507348042],
+            #     [-8.44246679e-05, -8.44246679e-05, -8.44246679e-05]
+            # ]  # [4, 3] area_front_switch
 
             # sh_parm = [
             #     [0.112574577, 0.112574577, 0.112574577],
@@ -999,15 +1050,15 @@ def train():
             #     [-0.181979418, -0.181979418, -0.181979418]
             # ]  # [4, 3] area_right
 
-            sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
-                              :1] + [len(sh_parm), len(sh_parm[0])]), tf.float32)
+            # sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
+            #                   :1] + [len(sh_parm), len(sh_parm[0])]), tf.float32)
             # [N_ray, 4, 3]
 
             # Compute MSE loss between predicted and true RGB.
             img_loss = img2mse(rgb, target_s)
-            sh_loss = img2mse(sh_coef, sh_parm)
+            # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            loss = img_loss + sh_loss
+            loss = img_loss
             psnr = mse2psnr(img_loss)
 
             # Add MSE loss for coarse-grained model
@@ -1037,10 +1088,10 @@ def train():
 
         if i % args.i_video == 0 and i > 0:
 
-            rgbs, albedos, shs, _ = render_path(
-                render_poses, hwf, args.chunk, render_kwargs_test)
+            rgbs, albedos, sh_lights, _ = render_path(
+                render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
             # print('Done, saving', rgbs.shape, disps.shape)
-            print('Done, saving', rgbs.shape, albedos.shape, shs.shape)
+            print('Done, saving', rgbs.shape, albedos.shape, sh_lights.shape)
             moviebase = os.path.join(
                 basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             imageio.mimwrite(moviebase + 'rgb.mp4',
@@ -1049,13 +1100,13 @@ def train():
             #                  to8b(disps / np.max(disps)), fps=30, quality=8)
             imageio.mimwrite(moviebase + 'albedo.mp4',
                              to8b(albedos), fps=30, quality=8)
-            imageio.mimwrite(moviebase + 'sh.mp4',
-                             to8b(shs), fps=30, quality=8)
+            # imageio.mimwrite(moviebase + 'sh_light.mp4',
+            #                  to8b(sh_lights), fps=30, quality=8)
 
             if args.use_viewdirs:
                 render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
                 rgbs_still, _, _, _ = render_path(
-                    render_poses, hwf, args.chunk, render_kwargs_test)
+                    render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
                 render_kwargs_test['c2w_staticcam'] = None
                 # imageio.mimwrite(moviebase + 'rgb_still.mp4',
                 #                  to8b(rgbs_still), fps=30, quality=8)
@@ -1065,7 +1116,7 @@ def train():
                 basedir, expname, 'testset_{:06d}'.format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
-            render_path(poses[i_test], hwf, args.chunk, render_kwargs_test,
+            render_path(poses[i_test], hwfs[i_test], shs[i_test], args.chunk, render_kwargs_test,
                         gt_imgs=images[i_test], savedir=testsavedir)
             print('Saved test set')
 
@@ -1086,9 +1137,12 @@ def train():
                 img_i = np.random.choice(i_val)
                 target = images[img_i]
                 pose = poses[img_i, :3, :4]
+                sh = shs[img_i, :4, :3]
+                H, W, focal = hwfs[img_i]
+                H, W = int(H), int(W)
 
-                rgb, albedo, sh, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
-                                                               **render_kwargs_test)
+                rgb, albedo, sh_light, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh,
+                                                                     **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
@@ -1101,7 +1155,7 @@ def train():
                 imageio.imwrite(os.path.join(
                     testimgdir, '{:06d}_albedo.png'.format(i)), to8b(albedo))
                 imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_sh.png'.format(i)), to8b(sh))
+                    testimgdir, '{:06d}_sh_light.png'.format(i)), to8b(sh_light))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 

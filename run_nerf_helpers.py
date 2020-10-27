@@ -77,31 +77,38 @@ def get_embedder(multires, i=0):
 
 # Model architecture
 
-def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips=[4], use_viewdirs=False):
+def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, input_ch_sh=12, output_ch=4, skips=[4], use_viewdirs=False):
 
     relu = tf.keras.layers.ReLU()
     def dense(W, act=relu): return tf.keras.layers.Dense(W, activation=act)
 
+    # define input channels
     print('MODEL', input_ch, input_ch_views, type(
-        input_ch), type(input_ch_views), use_viewdirs)
+        input_ch), type(input_ch_views), input_ch_sh, type(input_ch_sh), use_viewdirs)
     input_ch = int(input_ch)
     input_ch_views = int(input_ch_views)
+    input_ch_sh = int(input_ch_sh)
 
-    inputs = tf.keras.Input(shape=(input_ch + input_ch_views))
-    inputs_pts, inputs_views = tf.split(inputs, [input_ch, input_ch_views], -1)
+    # implement input
+    inputs = tf.keras.Input(shape=(input_ch + input_ch_views + input_ch_sh))
+    inputs_pts, inputs_views, input_sh = tf.split(inputs, [input_ch, input_ch_views, input_ch_sh], -1)
     inputs_pts.set_shape([None, input_ch])
     inputs_views.set_shape([None, input_ch_views])
+    input_sh.set_shape([None, input_ch_sh])
+    print(inputs.shape, inputs_pts.shape, inputs_views.shape, input_sh.shape)
 
-    print(inputs.shape, inputs_pts.shape, inputs_views.shape)
-    outputs = inputs_pts
+    # output
+    # outputs = inputs_pts
+    outputs = tf.concat([inputs_pts, input_sh], -1) # [NEW] Concatenate SH 1
     for i in range(D):
         outputs = dense(W)(outputs)
         if i in skips:
-            outputs = tf.concat([inputs_pts, outputs], -1)
+            outputs = tf.concat([inputs_pts, input_sh, outputs], -1) # [NEW] Concatenate SH 2
 
     if use_viewdirs:
         alpha_out = dense(1, act=None)(outputs)
-        sh_out = dense(12, act=None)(outputs) # used for output spherical harmonics coefficients
+        # used for output spherical harmonics coefficients
+        sh_out = dense(12, act=None)(outputs)
         bottleneck = dense(256, act=None)(outputs)
         inputs_viewdirs = tf.concat(
             [bottleneck, inputs_views], -1)  # concat viewdirs
@@ -127,8 +134,10 @@ def get_rays(H, W, focal, c2w):
     i, j = tf.meshgrid(tf.range(W, dtype=tf.float32),
                        tf.range(H, dtype=tf.float32), indexing='xy')
     dirs = tf.stack([(i-W*.5)/focal, -(j-H*.5)/focal, -tf.ones_like(i)], -1)
-    rays_d = tf.reduce_sum(dirs[..., np.newaxis, :] * c2w[:3, :3], -1) # apply rotation only, which is ray directions
-    rays_o = tf.broadcast_to(c2w[:3, -1], tf.shape(rays_d)) # apply translation only, which is ray origins
+    # apply rotation only, which is ray directions
+    rays_d = tf.reduce_sum(dirs[..., np.newaxis, :] * c2w[:3, :3], -1)
+    # apply translation only, which is ray origins
+    rays_o = tf.broadcast_to(c2w[:3, -1], tf.shape(rays_d))
     return rays_o, rays_d
 
 

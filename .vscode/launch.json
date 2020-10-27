@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Lightstage",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "config_lightstage.txt"
+            ]
+        },
+        {
             "name": "Python: Lego",
             "type": "python",
             "request": "launch",

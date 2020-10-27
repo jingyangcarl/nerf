@@ -48,8 +48,8 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
     # list initialization for all
     all_imgs = []
     all_poses = []
-    all_hwf = []
-    all_sh = []
+    all_hwfs = []
+    all_shs = []
 
     counts = [0]
 
@@ -61,8 +61,8 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
         # list initialization for current split
         imgs = []
         poses = []
-        hwf = []
-        sh = []
+        hwfs = []
+        shs = []
 
         # set skip parameter
         if s == 'train' or testskip == 0:
@@ -75,22 +75,22 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
             fname = os.path.join(basedir, frame['file_path'])
             imgs.append(imageio.imread(fname))
             poses.append(np.array(frame['transform_matrix']))
-            hwf.append(np.array(frame['hwf']))
-            sh.append(np.array(frame['sh']))
+            hwfs.append(np.array(frame['hwf']))
+            shs.append(np.array(frame['sh']))
 
         # type process
         # keep all 4 channels (RGBA)
         imgs = (np.array(imgs) / 255.).astype(np.float32)
         poses = np.array(poses).astype(np.float32)
-        hwf = np.array(hwf).astype(np.float32)
-        sh = np.array(sh).astype(np.float32)
+        hwfs = np.array(hwfs).astype(np.float32)
+        shs = np.array(shs).astype(np.float32)
 
         # prepare for serialization
         counts.append(counts[-1] + imgs.shape[0])
         all_imgs.append(imgs)
         all_poses.append(poses)
-        all_hwf.append(hwf)
-        all_sh.append(sh)
+        all_hwfs.append(hwfs)
+        all_shs.append(shs)
 
     # split index
     i_split = [np.arange(counts[i], counts[i+1]) for i in range(3)]
@@ -98,8 +98,8 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
     # serialization
     imgs = np.concatenate(all_imgs, 0)
     poses = np.concatenate(all_poses, 0)
-    hwf = np.concatenate(all_hwf, 0)
-    sh = np.concatenate(all_sh, 0)
+    hwfs = np.concatenate(all_hwfs, 0)
+    shs = np.concatenate(all_shs, 0)
 
     # H, W = imgs[0].shape[:2]
     # camera_angle_x = float(meta['camera_angle_x'])
@@ -114,9 +114,9 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
         # H = H//2
         # W = W//2
         # focal = focal/2.
-        hwf[:, 0] = hwf[:, 0] // 2  # height
-        hwf[:, 1] = hwf[:, 1] // 2  # width
-        hwf[:, 2] = hwf[:, 2] / 2  # focal
-        imgs = tf.image.resize_area(imgs, [int(hwf[0,0]), int(hwf[0,1])]).numpy()
+        hwfs[:, 0] = hwfs[:, 0] // 2  # height
+        hwfs[:, 1] = hwfs[:, 1] // 2  # width
+        hwfs[:, 2] = hwfs[:, 2] / 2  # focal
+        imgs = tf.image.resize_area(imgs, [int(hwfs[0,0]), int(hwfs[0,1])]).numpy()
 
-    return imgs, poses, render_poses, hwf, i_split
+    return imgs, poses, hwfs, shs, render_poses, i_split
