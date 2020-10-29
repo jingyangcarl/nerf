@@ -99,8 +99,8 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
         return
     
     sh = imageio.imread(imgfiles[0]).shape
-    poses[:2, 4, :] = np.array(sh[:2]).reshape([2, 1])
-    poses[2, 4, :] = poses[2, 4, :] * 1./factor
+    poses[:2, 4, :] = np.array(sh[:2]).reshape([2, 1]) # fill in h and w
+    poses[2, 4, :] = poses[2, 4, :] * 1./factor # adjust focal
     
     if not load_imgs:
         return poses, bds

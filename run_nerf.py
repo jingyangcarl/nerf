@@ -192,11 +192,11 @@ def render_rays(ray_batch,
         # [N_rays, N_samples, 4]
         sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
-        # sh_coef_g = tf.multiply(sh_coef[..., :4], sh_parm)
+        # sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
+        sh_coef_g = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
-        # sh_coef_b = tf.multiply(sh_coef[..., :4], sh_parm)
+        # sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
+        sh_coef_b = tf.multiply(sh_coef[..., :4], sh_parm)
         sh_coef_out = tf.stack([sh_coef_r, sh_coef_g, sh_coef_b], axis=-1)
         # [N_rays, N_samples, 4, 3]
 
@@ -463,7 +463,7 @@ def render(H, W, focal,
     return ret_list + [ret_dict]
 
 
-def render_path(render_poses, hwfs, shs, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
+def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_imgs=None, savedir=None, render_factor=0):
 
     # H, W, focal = hwf
 
@@ -488,7 +488,8 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, gt_imgs=None, sav
         if shs.ndim == 2:
             sh = shs
         else:
-            sh = shs[i, :4, :3]
+            # sh = shs[i, :4, :3]
+            sh = shs[i, :16, :3]
 
         # prepare hwf
         if hwfs.ndim == 1:
@@ -520,7 +521,8 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, gt_imgs=None, sav
 
         if savedir is not None:
             rgb8 = to8b(rgbs[-1])
-            filename = os.path.join(savedir, '{:03d}.png'.format(i))
+            filename = os.path.join(
+                savedir, '{:03d}_{}.png'.format(i, names[i]))
             imageio.imwrite(filename, rgb8)
 
     rgbs = np.stack(rgbs, 0)
@@ -545,7 +547,8 @@ def create_nerf(args):
             args.multires_views, args.i_embed)
 
     # for sh, no need for positional encoding
-    input_ch_sh = 12
+    # input_ch_sh = 12
+    input_ch_sh = 48
 
     output_ch = 16  # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12
     skips = [4]
@@ -806,7 +809,7 @@ def train():
     elif args.dataset_type == 'lightstage':
 
         # load data
-        images, poses, hwfs, shs, render_poses, i_split = load_lightstage_data(
+        images, names, poses, hwfs, shs, render_poses, i_split = load_lightstage_data(
             basedir=args.datadir, half_res=args.half_res, testskip=args.testskip)
         print('Loaded lightstage', images.shape, poses.shape,
               hwfs.shape, shs.shape, render_poses.shape, args.datadir)
@@ -834,11 +837,23 @@ def train():
     # hwf = [H, W, focal]
     hwf_avg = np.average(hwfs, axis=0)
     sh_default = np.array([
-        [0.719291210, 0.780129194, 0.745780885],
-        [-0.0347954370, -0.0391526185, -0.00687278993],
-        [0.126413971, 0.103076041, 0.0546571091],
-        [-0.0953400061, -0.0732670426, -0.0373421051]
-    ]).astype(np.float32) # [4, 3] sunrise.exr
+        [0.638712, 0.284742, 0.118981],
+        [-0.121597, -0.0644393, -0.0280195],
+        [-0.0704244, -0.0440014, -0.0278942],
+        [-0.00941534, -0.0196714, -0.0270952],
+        [0.0244973, 0.019399, 0.0146708],
+        [-0.0738909, -0.0249716, -0.00191948],
+        [-0.112882, -0.0680578, -0.0321083],
+        [-0.0018545, -0.00141121, -0.00426523],
+        [0.121973, 0.109539, 0.0996329],
+        [0.195734, 0.0611543, -0.0115104],
+        [-0.0243289, -0.0109742, -0.00370652],
+        [0.119068, 0.0567287, 0.0189506],
+        [-0.0188627, -0.00730853, -0.0120698],
+        [-0.0146965, -0.00352992, 0.00319044],
+        [-0.00446196, -0.00805026, -0.00354193],
+        [-0.000833787, -0.0136447, -0.0227599]
+    ]).astype(np.float32)  # [16, 3] 03-Ueno-Shrine_3k.exr
 
     if args.render_test:
         render_poses = np.array(poses[i_test])
@@ -970,7 +985,8 @@ def train():
             # get traning data
             target = images[img_i]
             pose = poses[img_i, :3, :4]
-            sh = shs[img_i, :4, :3]
+            # sh = shs[img_i, :4, :3]
+            sh = shs[img_i, :16, :3]
             H, W, focal = hwfs[img_i]
             H, W = int(H), int(W)
 
@@ -1098,8 +1114,8 @@ def train():
                              to8b(rgbs), fps=30, quality=8)
             # imageio.mimwrite(moviebase + 'disp.mp4',
             #                  to8b(disps / np.max(disps)), fps=30, quality=8)
-            imageio.mimwrite(moviebase + 'albedo.mp4',
-                             to8b(albedos), fps=30, quality=8)
+            # imageio.mimwrite(moviebase + 'albedo.mp4',
+            #                  to8b(albedos), fps=30, quality=8)
             # imageio.mimwrite(moviebase + 'sh_light.mp4',
             #                  to8b(sh_lights), fps=30, quality=8)
 
@@ -1116,7 +1132,7 @@ def train():
                 basedir, expname, 'testset_{:06d}'.format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
-            render_path(poses[i_test], hwfs[i_test], shs[i_test], args.chunk, render_kwargs_test,
+            render_path(poses[i_test], hwfs[i_test], shs[i_test], args.chunk, render_kwargs_test, names=names[i_test],
                         gt_imgs=images[i_test], savedir=testsavedir)
             print('Saved test set')
 
@@ -1136,8 +1152,10 @@ def train():
                 # Log a rendered validation view to Tensorboard
                 img_i = np.random.choice(i_val)
                 target = images[img_i]
+                name = names[img_i]
                 pose = poses[img_i, :3, :4]
-                sh = shs[img_i, :4, :3]
+                # sh = shs[img_i, :4, :3]
+                sh = shs[img_i, :16, :3]
                 H, W, focal = hwfs[img_i]
                 H, W = int(H), int(W)
 
@@ -1151,11 +1169,11 @@ def train():
                 if i == 0:
                     os.makedirs(testimgdir, exist_ok=True)
                 imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}.png'.format(i)), to8b(rgb))
+                    testimgdir, '{:06d}_{}.png'.format(i, name)), to8b(rgb))
                 imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_albedo.png'.format(i)), to8b(albedo))
+                    testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
                 imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_sh_light.png'.format(i)), to8b(sh_light))
+                    testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 

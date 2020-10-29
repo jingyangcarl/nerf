@@ -15,4 +15,4 @@ white_bkgd = True
 
 N_rand = 1024
 
-lrate = 1e-4
+lrate = 2e-4
