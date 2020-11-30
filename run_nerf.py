@@ -272,6 +272,113 @@ def render_rays(ray_batch,
         # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
         return rgb_map, albedo_map, weights
 
+    def raws2outputs(raws, z_vals, rays_d, raw_=None):
+        """Transforms model's predictions to semantically meaningful values.
+
+        Args:
+          raw: [num_rays, num_samples along ray, 4]. Prediction from model.
+          z_vals: [num_rays, num_samples along ray]. Integration time.
+          rays_d: [num_rays, 3]. Direction of each ray.
+
+        Returns:
+          rgb_map: [num_rays, 3]. Estimated RGB color of a ray.
+          disp_map: [num_rays]. Disparity map. Inverse of depth map.
+          acc_map: [num_rays]. Sum of weights along each ray.
+          weights: [num_rays, num_samples]. Weights assigned to each sampled color.
+          depth_map: [num_rays]. Estimated distance to object.
+        """
+        # Function for computing density from model prediction. This value is
+        # strictly between [0, 1].
+        def raw2alpha(raw, dists, act_fn=tf.nn.relu): return 1.0 - \
+            tf.exp(-act_fn(raw) * dists)
+
+        raw = raws['raw']
+        raw_posx = raws['raw_posx']
+        raw_posy = raws['raw_posy']
+        raw_posz = raws['raw_posz']
+        raw_negx = raws['raw_negx']
+        raw_negy = raws['raw_negy']
+        raw_negz = raws['raw_negz']
+
+        # Compute 'distance' (in time) between each integration time along a ray.
+        dists = z_vals[..., 1:] - z_vals[..., :-1]
+
+        # The 'distance' from the last integration time is infinity.
+        dists = tf.concat(
+            [dists, tf.broadcast_to([1e10], dists[..., :1].shape)],
+            axis=-1)  # [N_rays, N_samples]
+
+        # Multiply each distance by the norm of its corresponding direction ray
+        # to convert to real world distance (accounts for non-unit directions).
+        dists = dists * tf.linalg.norm(rays_d[..., None, :], axis=-1)
+
+        # Extract albedo of each sample position along each ray.
+        albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+
+        # Extract sphereical harmoncis coefficients
+        sh_parm = [
+            1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
+            np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
+            np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
+            np.sqrt(3.0 / (4.0 * np.pi))  # l = 1; m = 1
+        ]
+
+        rgb = albedo  # [N_rays, N_samples, 3]
+
+        # Add noise to model's predictions for density. Can be used to
+        # regularize network during training (prevents floater artifacts).
+        noise = 0.
+        if raw_noise_std > 0.:
+            noise = tf.random.normal(raw[..., 3].shape) * raw_noise_std
+
+        # Predict density of each sample along each ray. Higher values imply    
+        # higher likelihood of being absorbed at this point.
+        alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
+        alpha_posx = raw2alpha(raw_posx[..., 3] + noise, dists)
+        alpha_posy = raw2alpha(raw_posy[..., 3] + noise, dists)
+        alpha_posz = raw2alpha(raw_posz[..., 3] + noise, dists)
+        alpha_negx = raw2alpha(raw_negx[..., 3] + noise, dists)
+        alpha_negy = raw2alpha(raw_negy[..., 3] + noise, dists)
+        alpha_negz = raw2alpha(raw_negz[..., 3] + noise, dists)
+
+        # Compute weight for RGB of each sample along each ray.  A cumprod() is
+        # used to express the idea of the ray not having reflected up to this
+        # sample yet.
+        # [N_rays, N_samples]
+        weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, axis=-1, exclusive=True)
+        weights_posx = alpha_posx * tf.math.cumprod(1.-alpha_posx + 1e-10, axis=-1, exclusive=True)
+        weights_posy = alpha_posy * tf.math.cumprod(1.-alpha_posy + 1e-10, axis=-1, exclusive=True)
+        weights_posz = alpha_posz * tf.math.cumprod(1.-alpha_posz + 1e-10, axis=-1, exclusive=True)
+        weights_negx = alpha_negx * tf.math.cumprod(1.-alpha_negx + 1e-10, axis=-1, exclusive=True)
+        weights_negy = alpha_negy * tf.math.cumprod(1.-alpha_negy + 1e-10, axis=-1, exclusive=True)
+        weights_negz = alpha_negz * tf.math.cumprod(1.-alpha_negz + 1e-10, axis=-1, exclusive=True)
+
+        # compute normal
+        norm_x = ((weights_posx-weights) + (weights-weights_negx)) / 2
+        norm_y = ((weights_posy-weights) + (weights-weights_negy)) / 2
+        norm_z = ((weights_posz-weights) + (weights-weights_negz)) / 2
+        norm = tf.stack([norm_x, norm_y, norm_z], axis=-1)
+        norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-5)
+
+        # Computed weighted albedo & spherical harmonics of each sample along each ray.
+        albedo_map = tf.reduce_sum(
+            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+
+        # Computed weighted color of each sample along each ray.
+        rgb_map = tf.reduce_sum(
+            weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
+        norm_map = tf.reduce_sum(weights[..., None] * norm, axis=-2)  # [N_rays, 3]
+
+        # Sum of weights along each ray. This value is in [0, 1] up to numerical error.
+        acc_map = tf.reduce_sum(weights, -1)
+
+        # To composite onto a white background, use the accumulated alpha map.
+        if white_bkgd:
+            rgb_map = rgb_map + (1.-acc_map[..., None])
+
+        # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
+        return rgb_map, albedo_map, norm_map, weights
+
     ###############################
     # batch size
     N_rays = ray_batch.shape[0]
@@ -309,13 +416,35 @@ def render_rays(ray_batch,
         z_vals = lower + (upper - lower) * t_rand
 
     # Points in space to evaluate model at.
-    pts = rays_o[..., None, :] + rays_d[..., None, :] * \
-        z_vals[..., :, None]  # [N_rays, N_samples, 3]
+    ray_w = 5 # ray width, the smaller the wider
+    delta = tf.reduce_mean(far-near).numpy() / (N_samples * ray_w)
+    pts_o = rays_o[..., None, :]
+    pts_d = rays_d[..., None, :]
+    pts_z = z_vals[..., :, None]
+    offset_x = tf.cast(tf.broadcast_to([delta, 0, 0], pts_o.shape.as_list()), tf.float32)
+    offset_y = tf.cast(tf.broadcast_to([0, delta, 0], pts_o.shape.as_list()), tf.float32)
+    offset_z = tf.cast(tf.broadcast_to([0, 0, delta], pts_o.shape.as_list()), tf.float32)
+    # pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]  # [N_rays, N_samples, 3]
+    pts = pts_o + pts_d * z_vals[..., :, None]  # [N_rays, N_samples, 3]
+    pts_posx = pts_o + offset_x + pts_d * pts_z  # [N_rays, N_samples, 3]
+    pts_posy = pts_o + offset_y + pts_d * pts_z  # [N_rays, N_samples, 3]
+    pts_posz = pts_o + offset_z + pts_d * pts_z  # [N_rays, N_samples, 3]
+    pts_negx = pts_o - offset_x + pts_d * pts_z  # [N_rays, N_samples, 3]
+    pts_negy = pts_o - offset_y + pts_d * pts_z  # [N_rays, N_samples, 3]
+    pts_negz = pts_o - offset_z + pts_d * pts_z  # [N_rays, N_samples, 3]
 
     # Evaluate model at each point.
     # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
     # raw = network_query_fn(pts, viewdirs, sh, network_fn)
     raw = network_query_fn(pts, viewdirs, network_fn)
+    raws = {}
+    raws['raw'] = raw
+    raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, network_fn)
+    raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, network_fn)
+    raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, network_fn)
+    raws['raw_negx'] = network_query_fn(pts_negx, viewdirs, network_fn)
+    raws['raw_negy'] = network_query_fn(pts_negy, viewdirs, network_fn)
+    raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, network_fn)
     if network_fn_ is not None:
         # raw_ = network_query_fn_(pts, viewdirs, sh, network_fn_)
         raw_ = network_query_fn_(pts, viewdirs, network_fn_)
@@ -325,11 +454,11 @@ def render_rays(ray_batch,
     else:
         # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
         #     raw, z_vals, rays_d)
-        rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
+        rgb_map, albedo_map, norm_map, weights = raws2outputs(raws, z_vals, rays_d)
 
     if N_importance > 0:
         # rgb_map_0, albedo_0, sh_0, spec_0, sh_coef_0, disp_map_0, acc_map_0 = rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map
-        rgb_map_0, albedo_0 = rgb_map, albedo_map
+        rgb_map_0, albedo_0, norm_0 = rgb_map, albedo_map, norm_map
 
         # Obtain additional integration times to evaluate based on the weights
         # assigned to colors in the coarse model.
@@ -340,13 +469,36 @@ def render_rays(ray_batch,
 
         # Obtain all points to evaluate color, density at.
         z_vals = tf.sort(tf.concat([z_vals, z_samples], -1), -1)
-        pts = rays_o[..., None, :] + rays_d[..., None, :] * \
-            z_vals[..., :, None]  # [N_rays, N_samples + N_importance, 3]
+
+        delta = tf.reduce_mean(far-near).numpy() / ((N_samples + N_importance) * ray_w)
+        pts_o = rays_o[..., None, :]
+        pts_d = rays_d[..., None, :]
+        pts_z = z_vals[..., :, None]
+        offset_x = tf.cast(tf.broadcast_to([delta, 0, 0], pts_o.shape.as_list()), tf.float32)
+        offset_y = tf.cast(tf.broadcast_to([0, delta, 0], pts_o.shape.as_list()), tf.float32)
+        offset_z = tf.cast(tf.broadcast_to([0, 0, delta], pts_o.shape.as_list()), tf.float32)
+        # pts = rays_o[..., None, :] + rays_d[..., None, :] * \
+        #     z_vals[..., :, None]  # [N_rays, N_samples + N_importance, 3]
+        pts = pts_o + pts_d * z_vals[..., :, None]  # [N_rays, N_samples + N_importance, 3]
+        pts_posx = pts_o + offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_posy = pts_o + offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_posz = pts_o + offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_negx = pts_o - offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_negy = pts_o - offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_negz = pts_o - offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
 
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
         # raw = network_query_fn(pts, viewdirs, sh, run_fn)
         raw = network_query_fn(pts, viewdirs, run_fn)
+        raws = {}
+        raws['raw'] = raw
+        raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, run_fn)
+        raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, run_fn)
+        raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, run_fn)
+        raws['raw_negx'] = network_query_fn(pts_negx, viewdirs, run_fn)
+        raws['raw_negy'] = network_query_fn(pts_negy, viewdirs, run_fn)
+        raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, run_fn)
         if network_fn_ is not None:
             run_fn_ = network_fn_ if network_fine_ is None else network_fine_
             # raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
@@ -357,16 +509,17 @@ def render_rays(ray_batch,
         else:
             # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
             #     raw, z_vals, rays_d)
-            rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
+            rgb_map, albedo_map, norm_map, weights = raws2outputs(raws, z_vals, rays_d)
 
     # ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
     #        'disp_map': disp_map, 'acc_map': acc_map}
-    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map}
+    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'norm_map': norm_map}
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
         ret['rgb0'] = rgb_map_0
         ret['albedo0'] = albedo_0
+        ret['norm0'] = norm_0
         # ret['sh0'] = sh_0
         # ret['spec0'] = spec_0
         # ret['sh_coef_0'] = sh_coef_0
@@ -473,7 +626,7 @@ def render(H, W, focal,
 
     # k_extract = ['rgb_map', 'albedo_map', 'sh_map', 'spec_map',
     #              'sh_coef_out', 'disp_map', 'acc_map']
-    k_extract = ['rgb_map', 'albedo_map']
+    k_extract = ['rgb_map', 'albedo_map', 'norm_map']
     ret_list = [all_ret[k] for k in k_extract]
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
@@ -496,6 +649,7 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
 
     rgbs = []
     albedos = []
+    norms = []
     # sh_lights = []
     # specs = []
     # disps = []
@@ -528,11 +682,12 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
             # render
         # rgb, albedo, sh_light, spec, _, disp, acc, _ = render(
         #     H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
-        rgb, albedo = render(H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
+        rgb, albedo, norm = render(H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
 
         #
         rgbs.append(rgb.numpy())
         albedos.append(albedo.numpy())
+        norms.append(norm.numpy())
         # sh_lights.append(sh_light.numpy())
         # specs.append(spec.numpy())
         # disps.append(disp.numpy())
@@ -546,21 +701,24 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
         if savedir is not None:
             rgb8 = to8b(rgbs[-1])
             albedo8 = to8b(albedos[-1])
+            norm8 = to8b(norms[-1])
             # sh_light8 = to8b(sh_lights[-1])
             # spec8 = to8b(specs[-1])
             # filename = os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i]))
             imageio.imwrite(os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i])), rgb8)
             imageio.imwrite(os.path.join(savedir, '{:03d}_{}_albedo.png'.format(i, names[i])), albedo8)
+            imageio.imwrite(os.path.join(savedir, '{:03d}_{}_norm.png'.format(i, names[i])), norm8)
             # imageio.imwrite(os.path.join(savedir, '{:03d}_{}_sh_light.png'.format(i, names[i])), sh_light8)
             # imageio.imwrite(os.path.join(savedir, '{:03d}_{}_spec.png'.format(i, names[i])), spec8)
 
     rgbs = np.stack(rgbs, 0)
     albedos = np.stack(albedos, 0)
+    norms = np.stack(norms, 0)
     # sh_lights = np.stack(sh_lights, 0)
     # disps = np.stack(disps, 0)
 
     # return rgbs, albedos, sh_lights, disps
-    return rgbs, albedos
+    return rgbs, albedos, norms
 
 
 def create_nerf(args):
@@ -1058,7 +1216,7 @@ def train():
             # rgb, albedo, sh_light, spec, sh_coef, disp, acc, extras = render(
             #     H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh,
             #     verbose=i < 10, retraw=True, **render_kwargs_train)
-            rgb, albedo, extras = render(
+            rgb, albedo, _, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
@@ -1146,7 +1304,7 @@ def train():
 
             # rgbs, albedos, sh_lights, _ = render_path(
             #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
-            rgbs, albedos = render_path(
+            rgbs, albedos, norms = render_path(
                 render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
             # print('Done, saving', rgbs.shape, disps.shape)
             print('Done, saving', rgbs.shape, albedos.shape)
@@ -1205,7 +1363,7 @@ def train():
 
                 # rgb, albedo, sh_light, spec, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh,
                 #                                                      **render_kwargs_test)
-                rgb, albedo, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, **render_kwargs_test)
+                rgb, albedo, norm, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
@@ -1213,10 +1371,9 @@ def train():
                 testimgdir = os.path.join(basedir, expname, 'tboard_val_imgs')
                 if i == 0:
                     os.makedirs(testimgdir, exist_ok=True)
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}.png'.format(i, name)), to8b(rgb))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
+                imageio.imwrite(os.path.join(testimgdir, '{:06d}_{}.png'.format(i, name)), to8b(rgb))
+                imageio.imwrite(os.path.join(testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
+                imageio.imwrite(os.path.join(testimgdir, '{:06d}_{}_norm.png'.format(i, name)), to8b(norm))
                 # imageio.imwrite(os.path.join(
                 #     testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
                 # imageio.imwrite(os.path.join(
