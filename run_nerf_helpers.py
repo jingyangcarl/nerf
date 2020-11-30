@@ -87,15 +87,18 @@ def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, input_ch_sh=12, ou
         input_ch), type(input_ch_views), input_ch_sh, type(input_ch_sh), use_viewdirs)
     input_ch = int(input_ch)
     input_ch_views = int(input_ch_views)
-    input_ch_sh = int(input_ch_sh)
+    # input_ch_sh = int(input_ch_sh)
 
     # implement input
-    inputs = tf.keras.Input(shape=(input_ch + input_ch_views + input_ch_sh))
-    inputs_pts, inputs_views, inputs_sh = tf.split(inputs, [input_ch, input_ch_views, input_ch_sh], -1)
+    # inputs = tf.keras.Input(shape=(input_ch + input_ch_views + input_ch_sh))
+    inputs = tf.keras.Input(shape=(input_ch + input_ch_views))
+    # inputs_pts, inputs_views, inputs_sh = tf.split(inputs, [input_ch, input_ch_views, input_ch_sh], -1)
+    inputs_pts, inputs_views = tf.split(inputs, [input_ch, input_ch_views], -1)
     inputs_pts.set_shape([None, input_ch])
     inputs_views.set_shape([None, input_ch_views])
-    inputs_sh.set_shape([None, input_ch_sh])
-    print(inputs.shape, inputs_pts.shape, inputs_views.shape, inputs_sh.shape)
+    # inputs_sh.set_shape([None, input_ch_sh])
+    # print(inputs.shape, inputs_pts.shape, inputs_views.shape, inputs_sh.shape)
+    print(inputs.shape, inputs_pts.shape, inputs_views.shape)
 
     # output
     outputs = inputs_pts
@@ -109,20 +112,20 @@ def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, input_ch_sh=12, ou
     if use_viewdirs:
         alpha_out = dense(1, act=None)(outputs)
         # used for output spherical harmonics coefficients
-        sh_out = dense(12, act=None)(outputs)
-        specular_out = dense(1, act=None)(outputs)
+        # sh_out = dense(12, act=None)(outputs)
+        # specular_out = dense(1, act=None)(outputs)
         bottleneck = dense(256, act=None)(outputs)
-        # inputs_viewdirs = tf.concat([bottleneck, inputs_views], -1)  # concat viewdirs
-        inputs_viewdirs_sh = tf.concat([bottleneck, inputs_views, inputs_sh], -1)  # concat viewdirs and sh
-        # outputs = inputs_viewdirs
-        outputs = inputs_viewdirs_sh
+        inputs_viewdirs = tf.concat([bottleneck, inputs_views], -1)  # concat viewdirs
+        # inputs_viewdirs_sh = tf.concat([bottleneck, inputs_views, inputs_sh], -1)  # concat viewdirs and sh
+        outputs = inputs_viewdirs
+        # outputs = inputs_viewdirs_sh
         # The supplement to the paper states there are 4 hidden layers here, but this is an error since
         # the experiments were actually run with 1 hidden layer, so we will leave it as 1.
         for i in range(1):
             outputs = dense(W//2)(outputs)
         outputs = dense(3, act=None)(outputs)
-        # outputs = tf.concat([outputs, alpha_out], -1)
-        outputs = tf.concat([outputs, alpha_out, sh_out, specular_out], -1)
+        outputs = tf.concat([outputs, alpha_out], -1)
+        # outputs = tf.concat([outputs, alpha_out, sh_out, specular_out], -1)
     else:
         outputs = dense(output_ch, act=None)(outputs)
 

@@ -27,7 +27,8 @@ def batchify(fn, chunk):
     return ret
 
 
-def run_network(inputs, viewdirs, sh, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
+# def run_network(inputs, viewdirs, sh, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
+def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
     """Prepares inputs and applies network 'fn'."""
 
     inputs_flat = tf.reshape(inputs, [-1, inputs.shape[-1]])
@@ -41,10 +42,10 @@ def run_network(inputs, viewdirs, sh, fn, embed_fn, embeddirs_fn, netchunk=1024*
         embedded = tf.concat([embedded, embedded_dirs], -1)
 
     # embed spherical harmonics
-    if sh is not None:
-        sh = sh.reshape(-1)
-        sh = tf.broadcast_to(sh, (embedded.shape[0], sh.shape[0]))
-        embedded = tf.concat((embedded, sh), -1)
+    # if sh is not None:
+    #     sh = sh.reshape(-1)
+    #     sh = tf.broadcast_to(sh, (embedded.shape[0], sh.shape[0]))
+    #     embedded = tf.concat((embedded, sh), -1)
 
     outputs_flat = batchify(fn, netchunk)(embedded)
     outputs = tf.reshape(outputs_flat, list(
@@ -185,43 +186,44 @@ def render_rays(ray_batch,
             sh_coef = tf.broadcast_to(sh_coef, raw.shape.as_list()[
                                       :2] + [len(sh_coef)], tf.float32)
         else:
-            sh_coef = raw[..., 4:-1]  # [N_rays, N_samples, 12]
+            pass
+            # sh_coef = raw[..., 4:-1]  # [N_rays, N_samples, 12]
             # sh_coef = tf.math.sigmoid(raw[..., -12:])*2 - 1  # [N_rays, N_samples, 12]
 
-        sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
-                          :2] + [len(sh_parm)]), tf.float32)
+        # sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
+        #                   :2] + [len(sh_parm)]), tf.float32)
         # [N_rays, N_samples, 4]
-        sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
+        # sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
+        # sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
         # sh_coef_g = tf.multiply(sh_coef[..., :4], sh_parm)
         # [N_rays, N_samples, 4]
-        sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
+        # sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
         # sh_coef_b = tf.multiply(sh_coef[..., :4], sh_parm)
-        sh_coef_out = tf.stack([sh_coef_r, sh_coef_g, sh_coef_b], axis=-1)
+        # sh_coef_out = tf.stack([sh_coef_r, sh_coef_g, sh_coef_b], axis=-1)
         # [N_rays, N_samples, 4, 3]
 
         # Get spherical harmonics normals
-        sh_norm = -rays_d / \
-            tf.linalg.norm(rays_d, axis=-1, keepdims=True)  # normalization
-        sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[
-                                  :2] + [3])  # [N_rays, 3] -> [N_rays, N_sample, 3]
-        sh_norm = tf.concat([tf.broadcast_to(
-            [1.0], sh_norm[..., :1].shape), sh_norm], axis=-1)  # [N_rays, N_sample, 3] -> [N_rays, N_sample, 4]
+        # sh_norm = -rays_d / \
+        #     tf.linalg.norm(rays_d, axis=-1, keepdims=True)  # normalization
+        # sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[
+        #                           :2] + [3])  # [N_rays, 3] -> [N_rays, N_sample, 3]
+        # sh_norm = tf.concat([tf.broadcast_to(
+        #     [1.0], sh_norm[..., :1].shape), sh_norm], axis=-1)  # [N_rays, N_sample, 3] -> [N_rays, N_sample, 4]
 
         # Get spherical harmonics lighting
-        sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm),
-                             axis=2)  # [N_rays, N_samples]
-        sh_g = tf.reduce_sum(tf.multiply(sh_coef_g, sh_norm), axis=2)
-        sh_b = tf.reduce_sum(tf.multiply(sh_coef_b, sh_norm), axis=2)
-        sh = tf.stack([sh_r, sh_g, sh_b], axis=-
-                      1)  # [N_rays, N_samples, 3]
+        # sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm),
+        #                      axis=2)  # [N_rays, N_samples]
+        # sh_g = tf.reduce_sum(tf.multiply(sh_coef_g, sh_norm), axis=2)
+        # sh_b = tf.reduce_sum(tf.multiply(sh_coef_b, sh_norm), axis=2)
+        # sh = tf.stack([sh_r, sh_g, sh_b], axis=-1)  # [N_rays, N_samples, 3]
 
         # Extract specular coefficients
-        specular = tf.math.sigmoid(raw[..., -1]) # [N_rays, N_samples]
+        # specular = tf.math.sigmoid(raw[..., -1]) # [N_rays, N_samples]
 
         # rgb = tf.multiply(albedo, sh)  # [N_rays, N_samples, 3]
-        rgb = tf.multiply(albedo, sh) + specular[..., None] * sh  # [N_rays, N_samples, 3]
+        rgb = albedo  # [N_rays, N_samples, 3]
+        # rgb = tf.multiply(albedo, sh) + specular[..., None] * sh  # [N_rays, N_samples, 3]
         # the specular of skin is around 0.35
 
         # Add noise to model's predictions for density. Can be used to
@@ -248,8 +250,8 @@ def render_rays(ray_batch,
         # Computed weighted albedo & spherical harmonics of each sample along each ray.
         albedo_map = tf.reduce_sum(
             weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
-        sh_map = tf.reduce_sum(weights[..., None] * sh, axis=-2)  # [N_rays, 3]
-        spec_map = tf.reduce_sum(weights * specular, axis=-1) # [N_ray]
+        # sh_map = tf.reduce_sum(weights[..., None] * sh, axis=-2)  # [N_rays, 3]
+        # spec_map = tf.reduce_sum(weights * specular, axis=-1) # [N_ray]
         # sh_coef_out = tf.reduce_sum(
         #     weights[..., None, None] * sh_coef_out, axis=-3)  # [N_ray, 4, 3]
 
@@ -312,9 +314,11 @@ def render_rays(ray_batch,
 
     # Evaluate model at each point.
     # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
-    raw = network_query_fn(pts, viewdirs, sh, network_fn)
+    # raw = network_query_fn(pts, viewdirs, sh, network_fn)
+    raw = network_query_fn(pts, viewdirs, network_fn)
     if network_fn_ is not None:
-        raw_ = network_query_fn_(pts, viewdirs, sh, network_fn_)
+        # raw_ = network_query_fn_(pts, viewdirs, sh, network_fn_)
+        raw_ = network_query_fn_(pts, viewdirs, network_fn_)
         # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
         #     raw, z_vals, rays_d, raw_)
         rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
@@ -341,10 +345,12 @@ def render_rays(ray_batch,
 
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
-        raw = network_query_fn(pts, viewdirs, sh, run_fn)
+        # raw = network_query_fn(pts, viewdirs, sh, run_fn)
+        raw = network_query_fn(pts, viewdirs, run_fn)
         if network_fn_ is not None:
             run_fn_ = network_fn_ if network_fine_ is None else network_fine_
-            raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
+            # raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
+            raw_ = network_query_fn_(pts, viewdirs, run_fn_)
             # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
             #     raw, z_vals, rays_d, raw_)
             rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
@@ -574,8 +580,9 @@ def create_nerf(args):
     # input_ch_sh = 12
     input_ch_sh = 48
 
+    output_ch = 4 # r, g, b, sigma
     # output_ch = 16  # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12
-    output_ch = 17  # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12, specular
+    # output_ch = 17  # r, g, b, sigma, rs00, rs10, rs11, rs12, gs00, gs10, gs11, gs12, bs00, bs10, bs11, bs12, specular
     skips = [4]
     model = init_nerf_model(
         D=args.netdepth, W=args.netwidth,
@@ -593,8 +600,13 @@ def create_nerf(args):
         grad_vars += model_fine.trainable_variables
         models['model_fine'] = model_fine
 
-    def network_query_fn(inputs, viewdirs, sh, network_fn): return run_network(
-        inputs, viewdirs, sh, network_fn,
+    # def network_query_fn(inputs, viewdirs, sh, network_fn): return run_network(
+    #     inputs, viewdirs, sh, network_fn,
+    #     embed_fn=embed_fn,
+    #     embeddirs_fn=embeddirs_fn,
+    #     netchunk=args.netchunk)
+    def network_query_fn(inputs, viewdirs, network_fn): return run_network(
+        inputs, viewdirs, network_fn,
         embed_fn=embed_fn,
         embeddirs_fn=embeddirs_fn,
         netchunk=args.netchunk)
