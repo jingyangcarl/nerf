@@ -250,15 +250,15 @@ def render_rays(ray_batch,
             weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
         sh_map = tf.reduce_sum(weights[..., None] * sh, axis=-2)  # [N_rays, 3]
         spec_map = tf.reduce_sum(weights * specular, axis=-1) # [N_ray]
-        sh_coef_out = tf.reduce_sum(
-            weights[..., None, None] * sh_coef_out, axis=-3)  # [N_ray, 4, 3]
+        # sh_coef_out = tf.reduce_sum(
+        #     weights[..., None, None] * sh_coef_out, axis=-3)  # [N_ray, 4, 3]
 
         # Estimated depth map is expected distance.
-        depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
+        # depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
 
         # Disparity map is inverse depth.
-        disp_map = 1./tf.maximum(1e-10, depth_map /
-                                 tf.reduce_sum(weights, axis=-1))
+        # disp_map = 1./tf.maximum(1e-10, depth_map /
+        #                          tf.reduce_sum(weights, axis=-1))
 
         # Sum of weights along each ray. This value is in [0, 1] up to numerical error.
         acc_map = tf.reduce_sum(weights, -1)
@@ -267,7 +267,8 @@ def render_rays(ray_batch,
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[..., None])
 
-        return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
+        # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
+        return rgb_map, albedo_map, weights
 
     ###############################
     # batch size
@@ -314,14 +315,17 @@ def render_rays(ray_batch,
     raw = network_query_fn(pts, viewdirs, sh, network_fn)
     if network_fn_ is not None:
         raw_ = network_query_fn_(pts, viewdirs, sh, network_fn_)
-        rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
-            raw, z_vals, rays_d, raw_)
+        # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+        #     raw, z_vals, rays_d, raw_)
+        rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
     else:
-        rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
-            raw, z_vals, rays_d)
+        # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+        #     raw, z_vals, rays_d)
+        rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
 
     if N_importance > 0:
-        rgb_map_0, albedo_0, sh_0, spec_0, sh_coef_0, disp_map_0, acc_map_0 = rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map
+        # rgb_map_0, albedo_0, sh_0, spec_0, sh_coef_0, disp_map_0, acc_map_0 = rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map
+        rgb_map_0, albedo_0 = rgb_map, albedo_map
 
         # Obtain additional integration times to evaluate based on the weights
         # assigned to colors in the coarse model.
@@ -341,24 +345,27 @@ def render_rays(ray_batch,
         if network_fn_ is not None:
             run_fn_ = network_fn_ if network_fine_ is None else network_fine_
             raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
-            rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
-                raw, z_vals, rays_d, raw_)
+            # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+            #     raw, z_vals, rays_d, raw_)
+            rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
         else:
-            rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
-                raw, z_vals, rays_d)
+            # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+            #     raw, z_vals, rays_d)
+            rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
 
-    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
-           'disp_map': disp_map, 'acc_map': acc_map}
+    # ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
+    #        'disp_map': disp_map, 'acc_map': acc_map}
+    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map}
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
         ret['rgb0'] = rgb_map_0
         ret['albedo0'] = albedo_0
-        ret['sh0'] = sh_0
-        ret['spec0'] = spec_0
-        ret['sh_coef_0'] = sh_coef_0
-        ret['disp0'] = disp_map_0
-        ret['acc0'] = acc_map_0
+        # ret['sh0'] = sh_0
+        # ret['spec0'] = spec_0
+        # ret['sh_coef_0'] = sh_coef_0
+        # ret['disp0'] = disp_map_0
+        # ret['acc0'] = acc_map_0
         ret['z_std'] = tf.math.reduce_std(z_samples, -1)  # [N_rays]
 
     for k in ret:
@@ -458,8 +465,9 @@ def render(H, W, focal,
         k_sh = list(shp[:-1]) + list(all_ret[k].shape[1:])
         all_ret[k] = tf.reshape(all_ret[k], k_sh)
 
-    k_extract = ['rgb_map', 'albedo_map', 'sh_map', 'spec_map',
-                 'sh_coef_out', 'disp_map', 'acc_map']
+    # k_extract = ['rgb_map', 'albedo_map', 'sh_map', 'spec_map',
+    #              'sh_coef_out', 'disp_map', 'acc_map']
+    k_extract = ['rgb_map', 'albedo_map']
     ret_list = [all_ret[k] for k in k_extract]
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
@@ -482,9 +490,9 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
 
     rgbs = []
     albedos = []
-    sh_lights = []
-    specs = []
-    disps = []
+    # sh_lights = []
+    # specs = []
+    # disps = []
 
     t = time.time()
     for i, c2w in enumerate(render_poses):
@@ -512,15 +520,16 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
             focal = focal/render_factor
 
             # render
-        rgb, albedo, sh_light, spec, _, disp, acc, _ = render(
-            H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
+        # rgb, albedo, sh_light, spec, _, disp, acc, _ = render(
+        #     H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
+        rgb, albedo = render(H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
 
         #
         rgbs.append(rgb.numpy())
         albedos.append(albedo.numpy())
-        sh_lights.append(sh_light.numpy())
-        specs.append(spec.numpy())
-        disps.append(disp.numpy())
+        # sh_lights.append(sh_light.numpy())
+        # specs.append(spec.numpy())
+        # disps.append(disp.numpy())
         if i == 0:
             print(rgb.shape, disp.shape)
 
@@ -531,20 +540,21 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
         if savedir is not None:
             rgb8 = to8b(rgbs[-1])
             albedo8 = to8b(albedos[-1])
-            sh_light8 = to8b(sh_lights[-1])
-            spec8 = to8b(specs[-1])
+            # sh_light8 = to8b(sh_lights[-1])
+            # spec8 = to8b(specs[-1])
             # filename = os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i]))
             imageio.imwrite(os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i])), rgb8)
             imageio.imwrite(os.path.join(savedir, '{:03d}_{}_albedo.png'.format(i, names[i])), albedo8)
-            imageio.imwrite(os.path.join(savedir, '{:03d}_{}_sh_light.png'.format(i, names[i])), sh_light8)
-            imageio.imwrite(os.path.join(savedir, '{:03d}_{}_spec.png'.format(i, names[i])), spec8)
+            # imageio.imwrite(os.path.join(savedir, '{:03d}_{}_sh_light.png'.format(i, names[i])), sh_light8)
+            # imageio.imwrite(os.path.join(savedir, '{:03d}_{}_spec.png'.format(i, names[i])), spec8)
 
     rgbs = np.stack(rgbs, 0)
     albedos = np.stack(albedos, 0)
-    sh_lights = np.stack(sh_lights, 0)
-    disps = np.stack(disps, 0)
+    # sh_lights = np.stack(sh_lights, 0)
+    # disps = np.stack(disps, 0)
 
-    return rgbs, albedos, sh_lights, disps
+    # return rgbs, albedos, sh_lights, disps
+    return rgbs, albedos
 
 
 def create_nerf(args):
@@ -1033,7 +1043,10 @@ def train():
         with tf.GradientTape() as tape:
 
             # Make predictions for color, disparity, accumulated opacity.
-            rgb, albedo, sh_light, spec, sh_coef, disp, acc, extras = render(
+            # rgb, albedo, sh_light, spec, sh_coef, disp, acc, extras = render(
+            #     H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh,
+            #     verbose=i < 10, retraw=True, **render_kwargs_train)
+            rgb, albedo, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
@@ -1119,10 +1132,12 @@ def train():
 
         if i % args.i_video == 0 and i > 0:
 
-            rgbs, albedos, sh_lights, _ = render_path(
+            # rgbs, albedos, sh_lights, _ = render_path(
+            #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
+            rgbs, albedos = render_path(
                 render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
             # print('Done, saving', rgbs.shape, disps.shape)
-            print('Done, saving', rgbs.shape, albedos.shape, sh_lights.shape)
+            print('Done, saving', rgbs.shape, albedos.shape)
             moviebase = os.path.join(
                 basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             # imageio.mimwrite(moviebase + 'rgb.mp4',
@@ -1136,7 +1151,9 @@ def train():
 
             if args.use_viewdirs:
                 render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
-                rgbs_still, _, _, _ = render_path(
+                # rgbs_still, _, _, _ = render_path(
+                #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
+                rgbs_still, _ = render_path(
                     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
                 render_kwargs_test['c2w_staticcam'] = None
                 # imageio.mimwrite(moviebase + 'rgb_still.mp4',
@@ -1174,8 +1191,9 @@ def train():
                 H, W, focal = hwfs[img_i]
                 H, W = int(H), int(W)
 
-                rgb, albedo, sh_light, spec, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh,
-                                                                     **render_kwargs_test)
+                # rgb, albedo, sh_light, spec, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh,
+                #                                                      **render_kwargs_test)
+                rgb, albedo, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
@@ -1187,18 +1205,18 @@ def train():
                     testimgdir, '{:06d}_{}.png'.format(i, name)), to8b(rgb))
                 imageio.imwrite(os.path.join(
                     testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_spec.png'.format(i, name)), to8b(spec))
+                # imageio.imwrite(os.path.join(
+                #     testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
+                # imageio.imwrite(os.path.join(
+                #     testimgdir, '{:06d}_{}_spec.png'.format(i, name)), to8b(spec))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 
                     tf.contrib.summary.image('rgb', to8b(rgb)[tf.newaxis])
-                    tf.contrib.summary.image(
-                        'disp', disp[tf.newaxis, ..., tf.newaxis])
-                    tf.contrib.summary.image(
-                        'acc', acc[tf.newaxis, ..., tf.newaxis])
+                    # tf.contrib.summary.image(
+                    #     'disp', disp[tf.newaxis, ..., tf.newaxis])
+                    # tf.contrib.summary.image(
+                    #     'acc', acc[tf.newaxis, ..., tf.newaxis])
 
                     tf.contrib.summary.scalar('psnr_holdout', psnr)
                     tf.contrib.summary.image('rgb_holdout', target[tf.newaxis])
@@ -1208,8 +1226,8 @@ def train():
                     with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
                         tf.contrib.summary.image(
                             'rgb0', to8b(extras['rgb0'])[tf.newaxis])
-                        tf.contrib.summary.image(
-                            'disp0', extras['disp0'][tf.newaxis, ..., tf.newaxis])
+                        # tf.contrib.summary.image(
+                        #     'disp0', extras['disp0'][tf.newaxis, ..., tf.newaxis])
                         tf.contrib.summary.image(
                             'z_std', extras['z_std'][tf.newaxis, ..., tf.newaxis])
 
