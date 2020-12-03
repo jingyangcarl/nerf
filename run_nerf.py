@@ -359,38 +359,12 @@ def render_rays(ray_batch,
         norm_x = alpha_posx - alpha
         norm_y = alpha_posy - alpha
         norm_z = alpha_posz - alpha
-
         norm = tf.stack([norm_x, norm_y, norm_z], axis=-1)
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
-        # norm = tf.where(tf.is_nan(norm), tf.zeros_like(norm), norm)
-        # norm = tf.clip_by_value(norm, -1e12, 1e12) # remove nan and inf
         norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
         norm_x2, norm_y2, norm_z2 = norm_x*norm_x, norm_y*norm_y, norm_z*norm_z
 
         # Extract sphereical harmoncis coefficients
-        # sh_parm = [
-        #     # level 0
-        #     1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
-        #     # level 1
-        #     np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
-        #     np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
-        #     np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 1
-        #     # level 2
-        #     1.0 / 2.0 * np.sqrt(15.0 / np.pi),
-        #     1.0 / 2.0 * np.sqrt(15.0 / np.pi),
-        #     1.0 / 4.0 * np.sqrt(5.0 / np.pi),
-        #     1.0 / 2.0 * np.sqrt(15.0 / np.pi),
-        #     1.0 / 4.0 * np.sqrt(15.0 / np.pi),
-        #     # level 3
-        #     1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)),
-        #     1.0 / 2.0 * np.sqrt(105.0 / np.pi),
-        #     1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)),
-        #     1.0 / 4.0 * np.sqrt(7.0 / np.pi),
-        #     1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)),
-        #     1.0 / 4.0 * np.sqrt(105.0 / np.pi),
-        #     1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)),
-        # ]
-
         sh_basis = [
             # level 0
             tf.cast(tf.broadcast_to(1.0 / 2.0 * np.sqrt(1.0 / np.pi), norm_x.shape.as_list()), tf.float32), # l = 0; m = 0
@@ -418,15 +392,12 @@ def render_rays(ray_batch,
         sh_light = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
 
         # rgb = tf.multiply(albedo, sh_light)  # [N_rays, N_samples, 3]
-        rgb = albedo * sh_light
-
-        # Computed weighted albedo & spherical harmonics of each sample along each ray.
-        albedo_map = tf.reduce_sum(
-            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+        diffuse = albedo * sh_light
+        rgb = diffuse
 
         # Computed weighted color of each sample along each ray.
-        rgb_map = tf.reduce_sum(
-            weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
+        rgb_map = tf.reduce_sum(weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
+        albedo_map = tf.reduce_sum(weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
         norm_map = tf.reduce_sum(weights[..., None] * norm, axis=-2)  # [N_rays, 3]
         sh_light_map = tf.reduce_sum(weights[..., None] * sh_light, axis=-2)  # [N_rays, 3]
 
@@ -477,7 +448,7 @@ def render_rays(ray_batch,
         z_vals = lower + (upper - lower) * t_rand
 
     # Points in space to evaluate model at.
-    ray_w = 3 # ray width, the smaller the wider
+    ray_w = 2 # ray width, the smaller the wider
     delta = tf.reduce_mean(far-near).numpy() / (N_samples * ray_w)
     pts_o = rays_o[..., None, :]
     pts_d = rays_d[..., None, :]
@@ -753,7 +724,8 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
         # specs.append(spec.numpy())
         # disps.append(disp.numpy())
         if i == 0:
-            print(rgb.shape, disp.shape)
+            # print(rgb.shape, disp.shape)
+            print(rgb.shape)
 
         if gt_imgs is not None and render_factor == 0:
             p = -10. * np.log10(np.mean(np.square(rgb - gt_imgs[i])))

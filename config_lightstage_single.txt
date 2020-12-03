@@ -15,6 +15,6 @@ white_bkgd = True
 
 N_rand = 512
 
-lrate = 4e-5
+lrate = 3e-5
 
 testskip = 1
