@@ -324,9 +324,9 @@ def render_rays(ray_batch,
         # Predict density of each sample along each ray. Higher values imply    
         # higher likelihood of being absorbed at this point.
         alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
-        alpha_posx = raw2alpha(raw_posx[..., 3] + noise, dists)
-        alpha_posy = raw2alpha(raw_posy[..., 3] + noise, dists)
-        alpha_posz = raw2alpha(raw_posz[..., 3] + noise, dists)
+        # alpha_posx = raw2alpha(raw_posx[..., 3] + noise, dists)
+        # alpha_posy = raw2alpha(raw_posy[..., 3] + noise, dists)
+        # alpha_posz = raw2alpha(raw_posz[..., 3] + noise, dists)
         # alpha_negx = raw2alpha(raw_negx[..., 3] + noise, dists)
         # alpha_negy = raw2alpha(raw_negy[..., 3] + noise, dists)
         # alpha_negz = raw2alpha(raw_negz[..., 3] + noise, dists)
@@ -356,9 +356,18 @@ def render_rays(ray_batch,
         # norm_y = ((alpha_posy-alpha) + (alpha-alpha_negy)) / 2
         # norm_z = ((alpha_posz-alpha) + (alpha-alpha_negz)) / 2
 
-        norm_x = alpha_posx - alpha
-        norm_y = alpha_posy - alpha
-        norm_z = alpha_posz - alpha
+        # norm_x = alpha_posx - alpha
+        # norm_y = alpha_posy - alpha
+        # norm_z = alpha_posz - alpha
+        dens = tf.maximum(raw[..., -1], 0.)
+        dens_x = tf.maximum(raw_x[..., -1], 0.)
+        dens_y = tf.maximum(raw_y[..., -1], 0.)
+        dens_z = tf.maximum(raw_z[..., -1], 0.)
+
+        norm_x = dens - dens_x
+        norm_y = dens - dens_y
+        norm_z = dens - dens_z
+
         norm = tf.stack([norm_x, norm_y, norm_z], axis=-1)
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
         norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
@@ -1337,10 +1346,10 @@ def train():
 
             # rgbs, albedos, sh_lights, _ = render_path(
             #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
-            rgbs, albedos, norms = render_path(
+            rgbs, _, _, _ = render_path(
                 render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
             # print('Done, saving', rgbs.shape, disps.shape)
-            print('Done, saving', rgbs.shape, albedos.shape)
+            # print('Done, saving', rgbs.shape, albedos.shape)
             moviebase = os.path.join(
                 basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             # imageio.mimwrite(moviebase + 'rgb.mp4',
@@ -1356,7 +1365,7 @@ def train():
                 render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
                 # rgbs_still, _, _, _ = render_path(
                 #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
-                rgbs_still, _ = render_path(
+                rgbs_still, _, _, _ = render_path(
                     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
                 render_kwargs_test['c2w_staticcam'] = None
                 # imageio.mimwrite(moviebase + 'rgb_still.mp4',
