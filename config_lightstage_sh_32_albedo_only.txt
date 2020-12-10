@@ -1,6 +1,6 @@
-expname = model_0_sh_21_test
+expname = model_0_sh_32_albedo_only_test
 basedir = ./logs
-datadir = /glab2/Users/jyang/data/nerf_lightstage/model_0_sh_21
+datadir = /glab2/Users/jyang/data/nerf_lightstage/model_0_sh_32
 dataset_type = lightstage
 
 half_res = True
@@ -13,8 +13,8 @@ use_viewdirs = True
 
 white_bkgd = True
 
-N_rand = 512
+N_rand = 1024
 
-lrate = 1e-5
+lrate = 3e-5
 
 testskip = 1
