@@ -360,9 +360,9 @@ def render_rays(ray_batch,
         # norm_y = alpha_posy - alpha
         # norm_z = alpha_posz - alpha
         dens = tf.maximum(raw[..., -1], 0.)
-        dens_x = tf.maximum(raw_x[..., -1], 0.)
-        dens_y = tf.maximum(raw_y[..., -1], 0.)
-        dens_z = tf.maximum(raw_z[..., -1], 0.)
+        dens_x = tf.maximum(raw_posx[..., -1], 0.)
+        dens_y = tf.maximum(raw_posy[..., -1], 0.)
+        dens_z = tf.maximum(raw_posz[..., -1], 0.)
 
         norm_x = dens - dens_x
         norm_y = dens - dens_y
