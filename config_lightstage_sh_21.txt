@@ -13,8 +13,8 @@ use_viewdirs = True
 
 white_bkgd = True
 
-N_rand = 512
+N_rand = 896
 
-lrate = 1e-5
+lrate = 3e-5
 
 testskip = 1

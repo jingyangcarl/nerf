@@ -401,8 +401,8 @@ def render_rays(ray_batch,
         sh_light = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
 
         # rgb = tf.multiply(albedo, sh_light)  # [N_rays, N_samples, 3]
-        diffuse = albedo * sh_light
-        rgb = diffuse
+        diffuse = albedo
+        rgb = diffuse + sh_light
 
         # Computed weighted color of each sample along each ray.
         rgb_map = tf.reduce_sum(weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
