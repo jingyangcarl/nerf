@@ -360,13 +360,16 @@ def render_rays(ray_batch,
         # norm_y = alpha_posy - alpha
         # norm_z = alpha_posz - alpha
         dens = tf.maximum(raw[..., -1], 0.)
-        dens_x = tf.maximum(raw_posx[..., -1], 0.)
-        dens_y = tf.maximum(raw_posy[..., -1], 0.)
-        dens_z = tf.maximum(raw_posz[..., -1], 0.)
+        dens_posx = tf.maximum(raw_posx[..., -1], 0.)
+        dens_posy = tf.maximum(raw_posy[..., -1], 0.)
+        dens_posz = tf.maximum(raw_posz[..., -1], 0.)
+        # dens_negx = tf.maximum(raw_negx[..., -1], 0.)
+        # dens_negy = tf.maximum(raw_negy[..., -1], 0.)
+        # dens_negz = tf.maximum(raw_negz[..., -1], 0.)
 
-        norm_x = dens - dens_x
-        norm_y = dens - dens_y
-        norm_z = dens - dens_z
+        norm_x = dens - dens_posx
+        norm_y = dens - dens_posy
+        norm_z = dens - dens_posz
 
         norm = tf.stack([norm_x, norm_y, norm_z], axis=-1)
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
@@ -401,7 +404,7 @@ def render_rays(ray_batch,
         sh_light = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
 
         # rgb = tf.multiply(albedo, sh_light)  # [N_rays, N_samples, 3]
-        diffuse = albedo * sh_light
+        # diffuse = albedo * sh_light
         # rgb = diffuse
         rgb = albedo
 
@@ -458,7 +461,7 @@ def render_rays(ray_batch,
         z_vals = lower + (upper - lower) * t_rand
 
     # Points in space to evaluate model at.
-    ray_w = 2 # ray width, the smaller the wider
+    ray_w = 4 # ray width, the smaller the wider
     delta = tf.reduce_mean(far-near).numpy() / (N_samples * ray_w)
     pts_o = rays_o[..., None, :]
     pts_d = rays_d[..., None, :]
