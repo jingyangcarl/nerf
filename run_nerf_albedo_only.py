@@ -461,7 +461,7 @@ def render_rays(ray_batch,
         z_vals = lower + (upper - lower) * t_rand
 
     # Points in space to evaluate model at.
-    ray_w = 4 # ray width, the smaller the wider
+    ray_w = 8 # ray width, the smaller the wider
     delta = tf.reduce_mean(far-near).numpy() / (N_samples * ray_w)
     pts_o = rays_o[..., None, :]
     pts_d = rays_d[..., None, :]
