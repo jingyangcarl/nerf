@@ -1,6 +1,6 @@
 expname = model_0_sh_21_test
 basedir = ./logs
-datadir = /glab2/Users/jyang/data/nerf_lightstage/model_0_sh_21
+datadir = /glab2/Users/jyang/data/nerf_synthesic/model_0_sh_21
 dataset_type = lightstage
 
 half_res = True

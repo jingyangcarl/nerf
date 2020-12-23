@@ -65,6 +65,7 @@ def render_rays(ray_batch,
                 network_fine=None,
                 white_bkgd=False,
                 raw_noise_std=0.,
+                ray_width=4.,
 
                 network_fn_=None,
                 network_query_fn_=None,
@@ -457,8 +458,8 @@ def render_rays(ray_batch,
         z_vals = lower + (upper - lower) * t_rand
 
     # Points in space to evaluate model at.
-    ray_w = 2 # ray width, the smaller the wider
-    delta = tf.reduce_mean(far-near).numpy() / (N_samples * ray_w)
+    # ray_w = 2 # ray width, the smaller the wider
+    delta = tf.reduce_mean(far-near).numpy() / (N_samples * ray_width)
     pts_o = rays_o[..., None, :]
     pts_d = rays_d[..., None, :]
     pts_z = z_vals[..., :, None]
@@ -511,7 +512,7 @@ def render_rays(ray_batch,
         # Obtain all points to evaluate color, density at.
         z_vals = tf.sort(tf.concat([z_vals, z_samples], -1), -1)
 
-        delta = tf.reduce_mean(far-near).numpy() / ((N_samples + N_importance) * ray_w)
+        delta = tf.reduce_mean(far-near).numpy() / ((N_samples + N_importance) * ray_width)
         pts_o = rays_o[..., None, :]
         pts_d = rays_d[..., None, :]
         pts_z = z_vals[..., :, None]
@@ -821,6 +822,7 @@ def create_nerf(args):
         'use_viewdirs': args.use_viewdirs,
         'white_bkgd': args.white_bkgd,
         'raw_noise_std': args.raw_noise_std,
+        'ray_width': args.ray_width,
     }
 
     # NDC only good for LLFF-style forward facing data
@@ -923,6 +925,8 @@ def config_parser():
                         help='log2 of max freq for positional encoding (2D direction)')
     parser.add_argument("--raw_noise_std", type=float, default=0.,
                         help='std dev of noise added to regularize sigma_a output, 1e0 recommended')
+    parser.add_argument("--ray_width", type=float, default=4.,
+                        help='distance between rays when performing ray marching from the same direction')
 
     parser.add_argument("--render_only", action='store_true',
                         help='do not optimize, reload weights and render out render_poses path')
