@@ -5,14 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Lightstage",
+            "name": "Python: Lightstage 21",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "config_lightstage.txt"
+                "config_lightstage_sh_21.txt"
+            ]
+        },
+        {
+            "name": "Python: Lightstage 24",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "config_lightstage_sh_24.txt"
             ]
         },
         {
