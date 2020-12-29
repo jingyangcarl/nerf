@@ -1,6 +1,6 @@
 expname = model_0_sh_32_test
 basedir = ./logs
-datadir = /glab2/Users/jyang/data/nerf_lightstage/model_0_sh_32
+datadir = /glab2/Users/jyang/data/nerf_synthesic/model_0_sh_32
 dataset_type = lightstage
 
 half_res = True
@@ -14,7 +14,7 @@ use_viewdirs = True
 white_bkgd = True
 
 N_rand = 896
-
+chunk = 4096
 lrate = 3e-5
 
 testskip = 1
