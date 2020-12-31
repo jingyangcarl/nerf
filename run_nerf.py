@@ -430,9 +430,11 @@ def render_rays(ray_batch,
         n = np.ceil(v*h)
 
         # get color from light probe using 
+        l_power = 1.0
         l_dir = np.stack([x, y, z], axis=-1).astype(np.float32) # [h*w,3]
         l_color = np.reshape(light_probe, (-1,3)).astype(np.float32) # [h*w,3]
-        light_diffuse = tf.matmul(tf.matmul(norm, l_dir, transpose_b=True), l_color) # [N_rays, N_samples, 3] * [3, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
+        nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True), 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
+        light_diffuse = l_power * tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
         # rgb = tf.multiply(albedo, sh_light)  # [N_rays, N_samples, 3]
         diffuse = albedo
