@@ -18,3 +18,4 @@ chunk = 2048
 lrate = 3e-5
 
 testskip = 1
+i_img = 1000
