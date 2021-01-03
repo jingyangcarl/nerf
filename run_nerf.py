@@ -415,7 +415,8 @@ def render_rays(ray_batch,
         # get spherical coordinates
         r = 1
         theta = v * np.pi # 0 to pi
-        phi = (u-0.5) * 2*np.pi # -pi to pi
+        # phi = (u-0.5) * 2*np.pi # -pi to pi
+        phi = (u+0.25) * 2*np.pi # -pi to pi
 
         # spherical coordinates to cartesian coordinates
         X = r * np.sin(theta[..., None]) * np.cos(phi) # [h,w]
@@ -430,7 +431,7 @@ def render_rays(ray_batch,
         n = np.ceil(v*h)
 
         # get color from light probe using 
-        l_power = 1.0
+        l_power = 0.005
         l_dir = np.stack([x, y, z], axis=-1).astype(np.float32) # [h*w,3]
         l_color = np.reshape(light_probe, (-1,3)).astype(np.float32) # [h*w,3]
         nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True), 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
@@ -972,7 +973,7 @@ def config_parser():
                         help='log2 of max freq for positional encoding (2D direction)')
     parser.add_argument("--raw_noise_std", type=float, default=0.,
                         help='std dev of noise added to regularize sigma_a output, 1e0 recommended')
-    parser.add_argument("--ray_width", type=float, default=4.,
+    parser.add_argument("--ray_width", type=float, default=3.,
                         help='distance between rays when performing ray marching from the same direction')
 
     parser.add_argument("--render_only", action='store_true',
