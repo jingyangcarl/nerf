@@ -414,9 +414,9 @@ def render_rays(ray_batch,
 
         # get spherical coordinates
         r = 1
+        rot = 0.25
         theta = v * np.pi # 0 to pi
-        # phi = (u-0.5) * 2*np.pi # -pi to pi
-        phi = (u+0.25) * 2*np.pi # -pi to pi
+        phi = (u+rot) * 2*np.pi # -pi to pi
 
         # spherical coordinates to cartesian coordinates
         X = r * np.sin(theta[..., None]) * np.cos(phi) # [h,w]
@@ -433,7 +433,8 @@ def render_rays(ray_batch,
         # get color from light probe using 
         l_power = 5.0
         l_dir = np.stack([x, y, z], axis=-1).astype(np.float32) # [h*w,3]
-        l_color = np.reshape(light_probe, (-1,3)).astype(np.float32) # [h*w,3]
+        l_weight = np.sin(theta) # [h,]
+        l_color = np.reshape(light_probe * l_weight[:, None, None], (-1,3)).astype(np.float32) # [h*w,3]
         nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
         light_diffuse = l_power * tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
@@ -1113,7 +1114,7 @@ def train():
         # load light probe here for now
         light_probe = imageio.imread(args.datadir+'/light/equirectangular.exr')
         gain = 1.0
-        gamma = 2.2
+        gamma = 1.5
         light_probe = gain * (light_probe ** gamma) # gamma correction, gamma 2.2 is youtube default gamma
         light_probe = np.minimum(light_probe, 5.0) # filter way brighter light samples
 
