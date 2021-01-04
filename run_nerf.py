@@ -427,14 +427,14 @@ def render_rays(ray_batch,
         z = np.reshape(Z, -1)
 
         # map uv to pixel scale
-        m = np.ceil(u*w)
-        n = np.ceil(v*h)
+        # m = np.ceil(u*w)
+        # n = np.ceil(v*h)
 
         # get color from light probe using 
-        l_power = 0.005
+        l_power = 5.0
         l_dir = np.stack([x, y, z], axis=-1).astype(np.float32) # [h*w,3]
         l_color = np.reshape(light_probe, (-1,3)).astype(np.float32) # [h*w,3]
-        nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True), 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
+        nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
         light_diffuse = l_power * tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
         # rgb = tf.multiply(albedo, sh_light)  # [N_rays, N_samples, 3]
@@ -1112,6 +1112,10 @@ def train():
 
         # load light probe here for now
         light_probe = imageio.imread(args.datadir+'/light/equirectangular.exr')
+        gain = 1.0
+        gamma = 2.2
+        light_probe = gain * (light_probe ** gamma) # gamma correction, gamma 2.2 is youtube default gamma
+        light_probe = np.minimum(light_probe, 5.0) # filter way brighter light samples
 
         # set white_bkgd if alpha channel is available
         if args.white_bkgd:
