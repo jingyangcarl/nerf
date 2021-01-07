@@ -215,7 +215,7 @@ def render_rays(ray_batch,
         # raw_negx = raws['raw_negx']
         # raw_negy = raws['raw_negy']
         # raw_negz = raws['raw_negz']
-        raw_material = raws['raw_material']
+        # raw_material = raws['raw_material']
 
         # Compute 'distance' (in time) between each integration time along a ray.
         dists = z_vals[..., 1:] - z_vals[..., :-1]
@@ -230,7 +230,7 @@ def render_rays(ray_batch,
         dists = dists * tf.linalg.norm(rays_d[..., None, :], axis=-1)
 
         # Extract albedo of each sample position along each ray.
-        albedo = tf.math.sigmoid(raw_material[..., :3])  # [N_rays, N_samples, 3]
+        rgb = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to
         # regularize network during training (prevents floater artifacts).
@@ -332,15 +332,15 @@ def render_rays(ray_batch,
 
         # get color from light probe using 
         l_power = 5.0
+        sh_power = 1.0
         l_dir = np.stack([x, y, z], axis=-1).astype(np.float32) # [h*w,3]
         l_weight = np.sin(theta) # [h,]
         l_color = np.reshape(light_probe * l_weight[:, None, None], (-1,3)).astype(np.float32) # [h*w,3]
         nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
-        light_diffuse = l_power * tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
+        light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
-        # rgb = tf.multiply(albedo, sh_light)  # [N_rays, N_samples, 3]
-        diffuse = albedo
-        rgb = diffuse + sh_light
+        # rgb = albedo * light_diffuse + sh_light
+        albedo = (rgb - sh_power * sh_light) / (l_power * light_diffuse + 1e-5)
 
         # Computed weighted color of each sample along each ray.
         rgb_map = tf.reduce_sum(
@@ -475,7 +475,7 @@ def render_rays(ray_batch,
 
         # Make predictions with network_fine.
         run_occupancy = network_fn if network_fine is None else network_fine
-        run_material = network_fn if network_material is None else network_material
+        # run_material = network_fn if network_material is None else network_material
         raw = network_query_fn(pts, viewdirs, run_occupancy)
         raws = {}
         raws['raw'] = raw
@@ -485,7 +485,7 @@ def render_rays(ray_batch,
         # raws['raw_negx'] = network_query_fn(pts_negx, viewdirs, run_occupancy)
         # raws['raw_negy'] = network_query_fn(pts_negy, viewdirs, run_occupancy)
         # raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, run_occupancy)
-        raws['raw_material'] = network_query_fn(pts, viewdirs, run_material)
+        # raws['raw_material'] = network_query_fn(pts, viewdirs, run_material)
         if network_fn_ is not None:
             # run_fn_ = network_fn_ if network_fine_ is None else network_fine_
             # raw_ = network_query_fn_(pts, viewdirs, run_fn_)
@@ -493,7 +493,7 @@ def render_rays(ray_batch,
             #     raw, z_vals, rays_d, raw_)
             pass
         else:
-            rgb_1, _ = raw2outputs(raw, z_vals, rays_d)
+            # rgb_1, _ = raw2outputs(raw, z_vals, rays_d)
             rgb_map, albedo_map, diffuse_map, norm_map, sh_light_map, weights = raws2outputs(
                 raws, z_vals, rays_d, sh, light_probe)
 
@@ -505,7 +505,7 @@ def render_rays(ray_batch,
         ret['raw'] = raw
     if N_importance > 0:
         ret['rgb0'] = rgb_0
-        ret['rgb1'] = rgb_1
+        # ret['rgb1'] = rgb_1
         # ret['albedo0'] = albedo_0
         # ret['diffuse0'] = diffuse_0
         # ret['norm0'] = norm_0
@@ -741,7 +741,7 @@ def create_nerf(args):
     models = {'model': model}
 
     model_fine = None
-    model_material = None
+    # model_material = None
     if args.N_importance > 0:
         model_fine = init_nerf_model(
             D=args.netdepth_fine, W=args.netwidth_fine,
@@ -750,12 +750,12 @@ def create_nerf(args):
         grad_vars += model_fine.trainable_variables
         models['model_fine'] = model_fine
 
-        model_material = init_nerf_model(
-            D=args.netdepth_fine, W=args.netwidth_fine,
-            input_ch=input_ch, output_ch=output_ch, skips=skips,
-            input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
-        grad_vars += model_material.trainable_variables
-        models['model_material'] = model_material
+        # model_material = init_nerf_model(
+        #     D=args.netdepth_fine, W=args.netwidth_fine,
+        #     input_ch=input_ch, output_ch=output_ch, skips=skips,
+        #     input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
+        # grad_vars += model_material.trainable_variables
+        # models['model_material'] = model_material
 
     def network_query_fn(inputs, viewdirs, network_fn): return run_network(
         inputs, viewdirs, network_fn,
@@ -768,7 +768,7 @@ def create_nerf(args):
         'perturb': args.perturb,
         'N_importance': args.N_importance,
         'network_fine': model_fine,
-        'network_material': model_material,
+        # 'network_material': model_material,
         'N_samples': args.N_samples,
         'network_fn': model,
         'use_viewdirs': args.use_viewdirs,
@@ -1283,12 +1283,12 @@ def train():
             # Add MSE loss for coarse-grained model
             if 'rgb0' in extras:
                 img_loss0 = img2mse(extras['rgb0'], target_s)
-                loss += 0.25*img_loss0
-                # psnr0 = mse2psnr(img_loss0)
-            if 'rgb1' in extras:
-                img_loss1 = img2mse(extras['rgb1'], target_s)
-                loss += 0.75*img_loss1
-                psnr1 = mse2psnr(img_loss1)
+                loss += img_loss0
+                psnr0 = mse2psnr(img_loss0)
+            # if 'rgb1' in extras:
+            #     img_loss1 = img2mse(extras['rgb1'], target_s)
+            #     loss += 0.75*img_loss1
+            #     psnr1 = mse2psnr(img_loss1)
 
         gradients = tape.gradient(loss, grad_vars)
         optimizer.apply_gradients(zip(gradients, grad_vars))
@@ -1356,7 +1356,7 @@ def train():
                 tf.contrib.summary.scalar('psnr', psnr)
                 tf.contrib.summary.histogram('tran', trans)
                 if args.N_importance > 0:
-                    tf.contrib.summary.scalar('psnr1', psnr1)
+                    tf.contrib.summary.scalar('psnr0', psnr0)
 
             if i % args.i_img == 0:
 
@@ -1408,7 +1408,7 @@ def train():
 
                     with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
                         tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
-                        tf.contrib.summary.image('rgb1', to8b(extras['rgb1'])[tf.newaxis])
+                        # tf.contrib.summary.image('rgb1', to8b(extras['rgb1'])[tf.newaxis])
                         # tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis, ..., tf.newaxis])
                         tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis, ..., tf.newaxis])
 
