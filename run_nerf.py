@@ -64,6 +64,7 @@ def render_rays(ray_batch,
                 perturb=0.,
                 N_importance=0,
                 network_fine=None,
+                network_material=None,
                 white_bkgd=False,
                 raw_noise_std=0.,
                 ray_width=4.,
@@ -214,6 +215,7 @@ def render_rays(ray_batch,
         # raw_negx = raws['raw_negx']
         # raw_negy = raws['raw_negy']
         # raw_negz = raws['raw_negz']
+        raw_material = raws['raw_material']
 
         # Compute 'distance' (in time) between each integration time along a ray.
         dists = z_vals[..., 1:] - z_vals[..., :-1]
@@ -228,7 +230,7 @@ def render_rays(ray_batch,
         dists = dists * tf.linalg.norm(rays_d[..., None, :], axis=-1)
 
         # Extract albedo of each sample position along each ray.
-        albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+        albedo = tf.math.sigmoid(raw_material[..., :3])  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to
         # regularize network during training (prevents floater artifacts).
@@ -260,21 +262,6 @@ def render_rays(ray_batch,
         # weights_negz = alpha_negz * tf.math.cumprod(1.-alpha_negz + 1e-10, axis=-1, exclusive=True)
 
         # compute normal
-        # norm_x = ((weights_posx-weights) + (weights-weights_negx)) / 2
-        # norm_y = ((weights_posy-weights) + (weights-weights_negy)) / 2
-        # norm_z = ((weights_posz-weights) + (weights-weights_negz)) / 2
-
-        # norm_x = ((weights-weights_posx) + (weights_negx-weights)) / 2
-        # norm_y = ((weights-weights_posy) + (weights_negy-weights)) / 2
-        # norm_z = ((weights-weights_posz) + (weights_negz-weights)) / 2
-
-        # norm_x = ((alpha_posx-alpha) + (alpha-alpha_negx)) / 2
-        # norm_y = ((alpha_posy-alpha) + (alpha-alpha_negy)) / 2
-        # norm_z = ((alpha_posz-alpha) + (alpha-alpha_negz)) / 2
-
-        # norm_x = alpha_posx - alpha
-        # norm_y = alpha_posy - alpha
-        # norm_z = alpha_posz - alpha
         dens = tf.maximum(raw[..., -1], 0.)
         dens_x = tf.maximum(raw_posx[..., -1], 0.)
         dens_y = tf.maximum(raw_posy[..., -1], 0.)
@@ -454,12 +441,12 @@ def render_rays(ray_batch,
         #     raw, z_vals, rays_d)
         # rgb_map, albedo_map, diffuse_map, norm_map, sh_light_map, weights = raws2outputs(
         #     raws, z_vals, rays_d, sh, light_probe)
-    rgb_map, weights = raw2outputs(raw, z_vals, rays_d)
+    rgb_0, weights = raw2outputs(raw, z_vals, rays_d)
 
     if N_importance > 0:
 
         # rgb_0, albedo_0, diffuse_0, norm_0, sh_light_0 = rgb_map, albedo_map, diffuse_map, norm_map, sh_light_map
-        rgb_0 = rgb_map
+        # rgb_0 = rgb_map
 
         # Obtain additional integration times to evaluate based on the weights
         # assigned to colors in the coarse model.
@@ -487,17 +474,18 @@ def render_rays(ray_batch,
         # pts_negz = pts_o - offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
 
         # Make predictions with network_fine.
-        run_fn = network_fn if network_fine is None else network_fine
-        # raw = network_query_fn(pts, viewdirs, sh, run_fn)
-        raw = network_query_fn(pts, viewdirs, run_fn)
+        run_occupancy = network_fn if network_fine is None else network_fine
+        run_material = network_fn if network_material is None else network_material
+        raw = network_query_fn(pts, viewdirs, run_occupancy)
         raws = {}
         raws['raw'] = raw
-        raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, run_fn)
-        raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, run_fn)
-        raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, run_fn)
-        # raws['raw_negx'] = network_query_fn(pts_negx, viewdirs, run_fn)
-        # raws['raw_negy'] = network_query_fn(pts_negy, viewdirs, run_fn)
-        # raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, run_fn)
+        raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, run_occupancy)
+        raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, run_occupancy)
+        raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, run_occupancy)
+        # raws['raw_negx'] = network_query_fn(pts_negx, viewdirs, run_occupancy)
+        # raws['raw_negy'] = network_query_fn(pts_negy, viewdirs, run_occupancy)
+        # raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, run_occupancy)
+        raws['raw_material'] = network_query_fn(pts, viewdirs, run_material)
         if network_fn_ is not None:
             # run_fn_ = network_fn_ if network_fine_ is None else network_fine_
             # raw_ = network_query_fn_(pts, viewdirs, run_fn_)
@@ -505,6 +493,7 @@ def render_rays(ray_batch,
             #     raw, z_vals, rays_d, raw_)
             pass
         else:
+            rgb_1, _ = raw2outputs(raw, z_vals, rays_d)
             rgb_map, albedo_map, diffuse_map, norm_map, sh_light_map, weights = raws2outputs(
                 raws, z_vals, rays_d, sh, light_probe)
 
@@ -516,6 +505,7 @@ def render_rays(ray_batch,
         ret['raw'] = raw
     if N_importance > 0:
         ret['rgb0'] = rgb_0
+        ret['rgb1'] = rgb_1
         # ret['albedo0'] = albedo_0
         # ret['diffuse0'] = diffuse_0
         # ret['norm0'] = norm_0
@@ -751,6 +741,7 @@ def create_nerf(args):
     models = {'model': model}
 
     model_fine = None
+    model_material = None
     if args.N_importance > 0:
         model_fine = init_nerf_model(
             D=args.netdepth_fine, W=args.netwidth_fine,
@@ -759,11 +750,13 @@ def create_nerf(args):
         grad_vars += model_fine.trainable_variables
         models['model_fine'] = model_fine
 
-    # def network_query_fn(inputs, viewdirs, sh, network_fn): return run_network(
-    #     inputs, viewdirs, sh, network_fn,
-    #     embed_fn=embed_fn,
-    #     embeddirs_fn=embeddirs_fn,
-    #     netchunk=args.netchunk)
+        model_material = init_nerf_model(
+            D=args.netdepth_fine, W=args.netwidth_fine,
+            input_ch=input_ch, output_ch=output_ch, skips=skips,
+            input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
+        grad_vars += model_material.trainable_variables
+        models['model_material'] = model_material
+
     def network_query_fn(inputs, viewdirs, network_fn): return run_network(
         inputs, viewdirs, network_fn,
         embed_fn=embed_fn,
@@ -775,6 +768,7 @@ def create_nerf(args):
         'perturb': args.perturb,
         'N_importance': args.N_importance,
         'network_fine': model_fine,
+        'network_material': model_material,
         'N_samples': args.N_samples,
         'network_fn': model,
         'use_viewdirs': args.use_viewdirs,
@@ -812,10 +806,14 @@ def create_nerf(args):
         print('Resetting step to', start)
 
         if model_fine is not None:
-            ft_weights_fine = '{}_fine_{}'.format(
-                ft_weights[:-11], ft_weights[-10:])
+            ft_weights_fine = '{}_fine_{}'.format(ft_weights[:-11], ft_weights[-10:])
             print('Reloading fine from', ft_weights_fine)
             model_fine.set_weights(np.load(ft_weights_fine, allow_pickle=True))
+
+        if model_material is not None:
+            ft_weights_material = '{}_material_{}'.format(ft_weights[:-11], ft_weights[-10:])
+            print('Reloading material from', ft_weights_material)
+            model_material.set_weights(np.load(ft_weights_material, allow_pickle=True))
 
     return render_kwargs_train, render_kwargs_test, start, grad_vars, models
 
@@ -1285,8 +1283,12 @@ def train():
             # Add MSE loss for coarse-grained model
             if 'rgb0' in extras:
                 img_loss0 = img2mse(extras['rgb0'], target_s)
-                loss += img_loss0
-                psnr0 = mse2psnr(img_loss0)
+                loss += 0.5*img_loss0
+                # psnr0 = mse2psnr(img_loss0)
+            if 'rgb1' in extras:
+                img_loss1 = img2mse(extras['rgb0'], target_s)
+                loss += img_loss1
+                psnr1 = mse2psnr(img_loss1)
 
         gradients = tape.gradient(loss, grad_vars)
         optimizer.apply_gradients(zip(gradients, grad_vars))
@@ -1354,7 +1356,7 @@ def train():
                 tf.contrib.summary.scalar('psnr', psnr)
                 tf.contrib.summary.histogram('tran', trans)
                 if args.N_importance > 0:
-                    tf.contrib.summary.scalar('psnr0', psnr0)
+                    tf.contrib.summary.scalar('psnr1', psnr1)
 
             if i % args.i_img == 0:
 
