@@ -1283,11 +1283,11 @@ def train():
             # Add MSE loss for coarse-grained model
             if 'rgb0' in extras:
                 img_loss0 = img2mse(extras['rgb0'], target_s)
-                loss += 0.5*img_loss0
+                loss += 0.25*img_loss0
                 # psnr0 = mse2psnr(img_loss0)
             if 'rgb1' in extras:
-                img_loss1 = img2mse(extras['rgb0'], target_s)
-                loss += img_loss1
+                img_loss1 = img2mse(extras['rgb1'], target_s)
+                loss += 0.75*img_loss1
                 psnr1 = mse2psnr(img_loss1)
 
         gradients = tape.gradient(loss, grad_vars)
@@ -1408,6 +1408,7 @@ def train():
 
                     with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
                         tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
+                        tf.contrib.summary.image('rgb1', to8b(extras['rgb1'])[tf.newaxis])
                         # tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis, ..., tf.newaxis])
                         tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis, ..., tf.newaxis])
 
