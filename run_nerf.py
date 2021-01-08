@@ -261,6 +261,19 @@ def render_rays(ray_batch,
         # weights_negy = alpha_negy * tf.math.cumprod(1.-alpha_negy + 1e-10, axis=-1, exclusive=True)
         # weights_negz = alpha_negz * tf.math.cumprod(1.-alpha_negz + 1e-10, axis=-1, exclusive=True)
 
+        # Estimated depth map is expected distance.
+        depth_map = tf.reduce_sum(weights * z_vals, axis=-1) # [N_rays,]
+        # depth_map_posx = tf.reduce_sum(weights_posx * z_vals, axis=-1)
+        # depth_map_posy = tf.reduce_sum(weights_posy * z_vals, axis=-1)
+
+        # https://stackoverflow.com/questions/53350391/surface-normal-calculation-from-depth-map-in-python normal computation
+        # https://answers.opencv.org/question/82453/calculate-surface-normals-from-depth-image-using-neighboring-pixels-cross-product/
+        # zy, zx = np.gradient(depth_map)
+        # zx = np.gradient(depth_map, depth_map_posx)
+        # zy = np.gradient(depth_map, depth_map_posy)
+        # norm = np.dstack((-zx, -zy, np.ones_like(depth_map)))
+        # norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6) # [N_rays, N_samples, 3]
+
         # compute normal
         dens = tf.maximum(raw[..., -1], 0.)
         dens_x = tf.maximum(raw_posx[..., -1], 0.)
@@ -353,9 +366,6 @@ def render_rays(ray_batch,
             weights[..., None] * norm, axis=-2)  # [N_rays, 3]
         sh_light_map = tf.reduce_sum(
             weights[..., None] * sh_light, axis=-2)  # [N_rays, 3]
-
-        # Estimated depth map is expected distance.
-        depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
 
         # Sum of weights along each ray. This value is in [0, 1] up to numerical error.
         acc_map = tf.reduce_sum(weights, -1)
@@ -1381,22 +1391,23 @@ def train():
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
+                if i % 2*args.i_img == 0:
                 # Save out the validation image for Tensorboard-free monitoring
-                testimgdir = os.path.join(basedir, expname, 'tboard_val_imgs')
-                if i == 0:
-                    os.makedirs(testimgdir, exist_ok=True)
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}.png'.format(i, name)), to8b(rgb))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_diffuse.png'.format(i, name)), to8b(diffuse))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_norm.png'.format(i, name)), to8b(norm))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
-                imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_depth.png'.format(i, name)), depth)
+                    testimgdir = os.path.join(basedir, expname, 'tboard_val_imgs')
+                    if i == 0:
+                        os.makedirs(testimgdir, exist_ok=True)
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}.png'.format(i, name)), to8b(rgb))
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_diffuse.png'.format(i, name)), to8b(diffuse))
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_norm.png'.format(i, name)), to8b(norm))
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_depth.png'.format(i, name)), to8b(depth[..., tf.newaxis]))
 
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 
