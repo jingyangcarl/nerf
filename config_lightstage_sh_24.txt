@@ -13,8 +13,8 @@ use_viewdirs = True
 
 white_bkgd = True
 
-N_rand = 900
-chunk = 2048
+N_rand = 1024
+chunk = 4096
 lrate = 1e-4
 
 testskip = 1
