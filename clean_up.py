@@ -21,31 +21,31 @@ summary_sh_list = [
 ]
 
 dir_nerf_list = [
-    './log/nerf_lego_all_test',
-    './log/nerf_lego_partial_test',
-    './log/nerf_hotdog_test',
-    './log/nerf_chair_test',
-    './log/nerf_materials_test',
-    './log/nerf_ficus_test',
+    './logs/nerf_lego_all_test',
+    './logs/nerf_lego_partial_test',
+    './logs/nerf_hotdog_test',
+    './logs/nerf_chair_test',
+    './logs/nerf_materials_test',
+    './logs/nerf_ficus_test',
 ]
 
 summary_nerf_list = [
-    './log/summaries/nerf_lego_all_test',
-    './log/summaries/nerf_lego_partial_test',
-    './log/summaries/nerf_hotdog_test',
-    './log/summaries/nerf_chair_test',
-    './log/summaries/nerf_materials_test',
-    './log/summaries/nerf_ficus_test',
+    './logs/summaries/nerf_lego_all_test',
+    './logs/summaries/nerf_lego_partial_test',
+    './logs/summaries/nerf_hotdog_test',
+    './logs/summaries/nerf_chair_test',
+    './logs/summaries/nerf_materials_test',
+    './logs/summaries/nerf_ficus_test',
 ]
 
-for d in dir_sh_list:
+for d in dir_nerf_list:
     if os.path.exists(d):
         shutil.rmtree(d)
         print(d, 'is removed')
     else:
         print(d, 'is not existed')
 
-for d in summary_sh_list:
+for d in summary_nerf_list:
     if os.path.exists(d):
         shutil.rmtree(d)
         print(d, 'is removed')
