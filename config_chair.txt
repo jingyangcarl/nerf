@@ -1,6 +1,6 @@
-expname = lego_test
+expname = nerf_chair_test
 basedir = ./logs
-datadir = ./data/nerf_synthetic/lego
+datadir = /glab2/data/Users/jyang/data/nerf_synthesic/chair
 dataset_type = blender
 
 half_res = True
@@ -14,3 +14,6 @@ use_viewdirs = True
 white_bkgd = True
 
 N_rand = 1024
+chunk = 2048
+lrate = 1e-3
+i_img = 1000

@@ -20,6 +20,24 @@ summary_sh_list = [
     './logs/summaries/model_0_sh_45_test',
 ]
 
+dir_nerf_list = [
+    './log/nerf_lego_all_test',
+    './log/nerf_lego_partial_test',
+    './log/nerf_hotdog_test',
+    './log/nerf_chair_test',
+    './log/nerf_materials_test',
+    './log/nerf_ficus_test',
+]
+
+summary_nerf_list = [
+    './log/summaries/nerf_lego_all_test',
+    './log/summaries/nerf_lego_partial_test',
+    './log/summaries/nerf_hotdog_test',
+    './log/summaries/nerf_chair_test',
+    './log/summaries/nerf_materials_test',
+    './log/summaries/nerf_ficus_test',
+]
+
 for d in dir_sh_list:
     if os.path.exists(d):
         shutil.rmtree(d)

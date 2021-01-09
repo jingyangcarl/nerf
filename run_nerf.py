@@ -1,4 +1,4 @@
-from load_blender import load_blender_data
+from load_blender import load_blender_data, load_blender_data_fill_up
 from load_deepvoxels import load_dv_data
 from load_llff import load_llff_data
 from load_lightstage import load_lightstage_data
@@ -992,11 +992,19 @@ def train():
         print('NEAR FAR', near, far)
 
     elif args.dataset_type == 'blender':
-        images, poses, render_poses, hwf, i_split = load_blender_data(
+        # images, poses, render_poses, hwf, i_split = load_blender_data(
+        #     args.datadir, args.half_res, args.testskip)
+        # print('Loaded blender', images.shape,
+        #       render_poses.shape, hwf, args.datadir)
+        
+        images, names, poses, hwfs, shs, render_poses, i_split = load_blender_data_fill_up(
             args.datadir, args.half_res, args.testskip)
-        print('Loaded blender', images.shape,
-              render_poses.shape, hwf, args.datadir)
+        print('Loaded blender', images.shape, poses.shape,
+            hwfs.shape, shs.shape, render_poses.shape, args.datadir)
+
         i_train, i_val, i_test = i_split
+        
+        light_probe = imageio.imread('/glab2/data/Users/jyang/data/nerf_synthesic/model_0_sh_21/light/equirectangular.exr')
 
         near = 2.
         far = 6.

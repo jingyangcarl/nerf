@@ -1,6 +1,6 @@
-expname = materials_test
+expname = nerf_materials_test
 basedir = ./logs
-datadir = ./data/nerf_synthetic/materials
+datadir = /glab2/data/Users/jyang/data/nerf_synthesic/materials
 dataset_type = blender
 
 half_res = True
@@ -14,5 +14,6 @@ use_viewdirs = True
 white_bkgd = True
 
 N_rand = 1024
-
-lrate = 3.3e-3
+chunk = 2048
+lrate = 1e-3
+i_img = 1000

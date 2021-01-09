@@ -1,6 +1,6 @@
-expname = nerf_hotdog_test
+expname = nerf_lego_partial_test
 basedir = ./logs
-datadir = /glab2/data/Users/jyang/data/nerf_synthesic/hotdog
+datadir = /glab2/data/Users/jyang/data/nerf_synthesic/lego_partial
 dataset_type = blender
 
 half_res = True
