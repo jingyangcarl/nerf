@@ -212,9 +212,9 @@ def render_rays(ray_batch,
         raw_posx = raws['raw_posx']
         raw_posy = raws['raw_posy']
         raw_posz = raws['raw_posz']
-        # raw_negx = raws['raw_negx']
-        # raw_negy = raws['raw_negy']
-        # raw_negz = raws['raw_negz']
+        raw_negx = raws['raw_negx']
+        raw_negy = raws['raw_negy']
+        raw_negz = raws['raw_negz']
         # raw_material = raws['raw_material']
 
         # Compute 'distance' (in time) between each integration time along a ray.
@@ -276,13 +276,19 @@ def render_rays(ray_batch,
 
         # compute normal
         dens = tf.maximum(raw[..., -1], 0.)
-        dens_x = tf.maximum(raw_posx[..., -1], 0.)
-        dens_y = tf.maximum(raw_posy[..., -1], 0.)
-        dens_z = tf.maximum(raw_posz[..., -1], 0.)
+        dens_posx = tf.maximum(raw_posx[..., -1], 0.)
+        dens_posy = tf.maximum(raw_posy[..., -1], 0.)
+        dens_posz = tf.maximum(raw_posz[..., -1], 0.)
+        dens_negx = tf.maximum(raw_negx[..., -1], 0.)
+        dens_negy = tf.maximum(raw_negy[..., -1], 0.)
+        dens_negz = tf.maximum(raw_negz[..., -1], 0.)
 
-        norm_x = dens - dens_x
-        norm_y = dens - dens_y
-        norm_z = dens - dens_z
+        # norm_x = dens - dens_x
+        # norm_y = dens - dens_y
+        # norm_z = dens - dens_z
+        norm_x = (dens - dens_posx) + (dens_negx - dens)
+        norm_y = (dens - dens_posy) + (dens_negy - dens)
+        norm_z = (dens - dens_posz) + (dens_negz - dens)
 
         norm = tf.stack([norm_x, norm_y, norm_z], axis=-1)
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
@@ -482,9 +488,9 @@ def render_rays(ray_batch,
         pts_posx = pts_o + offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
         pts_posy = pts_o + offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
         pts_posz = pts_o + offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
-        # pts_negx = pts_o - offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
-        # pts_negy = pts_o - offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
-        # pts_negz = pts_o - offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_negx = pts_o - offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_negy = pts_o - offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_negz = pts_o - offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
 
         # Make predictions with network_fine.
         run_occupancy = network_fn if network_fine is None else network_fine
@@ -495,9 +501,9 @@ def render_rays(ray_batch,
         raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, run_occupancy)
         raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, run_occupancy)
         raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, run_occupancy)
-        # raws['raw_negx'] = network_query_fn(pts_negx, viewdirs, run_occupancy)
-        # raws['raw_negy'] = network_query_fn(pts_negy, viewdirs, run_occupancy)
-        # raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, run_occupancy)
+        raws['raw_negx'] = network_query_fn(pts_negx, viewdirs, run_occupancy)
+        raws['raw_negy'] = network_query_fn(pts_negy, viewdirs, run_occupancy)
+        raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, run_occupancy)
         # raws['raw_material'] = network_query_fn(pts, viewdirs, run_material)
         if network_fn_ is not None:
             # run_fn_ = network_fn_ if network_fine_ is None else network_fine_
@@ -1004,7 +1010,7 @@ def train():
 
         i_train, i_val, i_test = i_split
         
-        light_probe = imageio.imread('/glab2/data/Users/jyang/data/nerf_synthesic/model_0_sh_21/light/equirectangular.exr')
+        light_probe = imageio.imread('/glab2/Users/jyang/data/nerf_synthesic/model_0_sh_21/light/equirectangular.exr')
 
         near = 2.
         far = 6.
