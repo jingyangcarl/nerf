@@ -74,7 +74,7 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
 
         # read each frame
         for frame in meta['frames'][::skip]:
-            fname = os.path.join(basedir, frame['file_path'])
+            fname = os.path.join(basedir, frame['file_path'] + '.png')
             imgs.append(imageio.imread(fname))
             names.append(os.path.splitext(os.path.basename(fname))[0])
             poses.append(np.array(frame['transform_matrix']))
