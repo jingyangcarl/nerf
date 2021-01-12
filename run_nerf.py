@@ -750,7 +750,7 @@ def config_parser():
     # logging/saving options
     parser.add_argument("--i_print",   type=int, default=100,
                         help='frequency of console printout and metric loggin')
-    parser.add_argument("--i_img",     type=int, default=500,
+    parser.add_argument("--i_img",     type=int, default=1000,
                         help='frequency of tensorboard image logging')
     parser.add_argument("--i_weights", type=int, default=10000,
                         help='frequency of weight ckpt saving')
@@ -1134,12 +1134,12 @@ def train():
 
             # rgbs, albedos, sh_lights, _ = render_path(
             #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
-            rgbs, albedos = render_path(
-                render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
+            # rgbs, albedos = render_path(
+            #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
             # print('Done, saving', rgbs.shape, disps.shape)
-            print('Done, saving', rgbs.shape, albedos.shape)
-            moviebase = os.path.join(
-                basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
+            # print('Done, saving', rgbs.shape, albedos.shape)
+            # moviebase = os.path.join(
+            #     basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             # imageio.mimwrite(moviebase + 'rgb.mp4',
             #                  to8b(rgbs), fps=30, quality=8)
             # imageio.mimwrite(moviebase + 'disp.mp4',
