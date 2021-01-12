@@ -1148,6 +1148,7 @@ def train():
             #                  to8b(albedos), fps=30, quality=8)
             # imageio.mimwrite(moviebase + 'sh_light.mp4',
             #                  to8b(sh_lights), fps=30, quality=8)
+            pass
 
             if args.use_viewdirs:
                 # render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
@@ -1158,6 +1159,7 @@ def train():
                 # render_kwargs_test['c2w_staticcam'] = None
                 # imageio.mimwrite(moviebase + 'rgb_still.mp4',
                 #                  to8b(rgbs_still), fps=30, quality=8)
+                pass
 
         if i % args.i_testset == 0 and i > 0:
             testsavedir = os.path.join(
