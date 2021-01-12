@@ -360,7 +360,7 @@ def render_rays(ray_batch,
         ret['raw'] = raw
     if N_importance > 0:
         ret['rgb0'] = rgb_map_0
-        ret['albedo0'] = albedo_0
+        # ret['albedo0'] = albedo_0
         # ret['sh0'] = sh_0
         # ret['spec0'] = spec_0
         # ret['sh_coef_0'] = sh_coef_0
@@ -1150,12 +1150,12 @@ def train():
             #                  to8b(sh_lights), fps=30, quality=8)
 
             if args.use_viewdirs:
-                render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
-                # rgbs_still, _, _, _ = render_path(
+                # render_kwargs_test['c2w_staticcam'] = render_poses[0][:3, :4]
+                # # rgbs_still, _, _, _ = render_path(
+                # #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
+                # rgbs_still, _ = render_path(
                 #     render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
-                rgbs_still, _ = render_path(
-                    render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test)
-                render_kwargs_test['c2w_staticcam'] = None
+                # render_kwargs_test['c2w_staticcam'] = None
                 # imageio.mimwrite(moviebase + 'rgb_still.mp4',
                 #                  to8b(rgbs_still), fps=30, quality=8)
 
