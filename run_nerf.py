@@ -522,7 +522,7 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
             # render
         # rgb, albedo, sh_light, spec, _, disp, acc, _ = render(
         #     H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
-        rgb, albedo = render(H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
+        rgb, albedo, _ = render(H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
 
         #
         rgbs.append(rgb.numpy())
