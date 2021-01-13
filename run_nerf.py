@@ -531,7 +531,8 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
         # specs.append(spec.numpy())
         # disps.append(disp.numpy())
         if i == 0:
-            print(rgb.shape, disp.shape)
+            # print(rgb.shape, disp.shape)
+            pass
 
         if gt_imgs is not None and render_factor == 0:
             p = -10. * np.log10(np.mean(np.square(rgb - gt_imgs[i])))
