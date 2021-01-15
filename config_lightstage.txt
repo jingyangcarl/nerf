@@ -1,6 +1,6 @@
-expname = model_0_test
+expname = model_0_test_near150_far400
 basedir = ./logs
-datadir = ./data/nerf_lightstage/model_0
+datadir = /glab2/data/Users/jyang/data/nerf_synthesic/model_0
 dataset_type = lightstage
 
 half_res = True
@@ -13,6 +13,6 @@ use_viewdirs = True
 
 white_bkgd = True
 
-N_rand = 512
-
-lrate = 2e-5
+N_rand = 700
+chunk = 2048
+lrate = 1e-4

@@ -1,6 +1,6 @@
-expname = model_0_sh_37_test
+expname = model_0_sh_37_test_near100_far250
 basedir = ./logs
-datadir = /glab2/Users/jyang/data/nerf_synthesic/model_0_sh_37
+datadir = /glab2/data/Users/jyang/data/nerf_synthesic/model_0_sh_37
 dataset_type = lightstage
 
 half_res = True
@@ -13,7 +13,7 @@ use_viewdirs = True
 
 white_bkgd = True
 
-N_rand = 700
+N_rand = 1024
 chunk = 2048
 lrate = 1e-4
 
