@@ -147,81 +147,79 @@ def render_rays(ray_batch,
         albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
 
         # Extract sphereical harmoncis coefficients
-        sh_parm = [
-            1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
-            np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
-            np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
-            np.sqrt(3.0 / (4.0 * np.pi))  # l = 1; m = 1
-        ]
+        # sh_parm = [
+        #     1.0 / 2.0 * np.sqrt(1.0 / np.pi),  # l = 0; m = 0
+        #     np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = -1
+        #     np.sqrt(3.0 / (4.0 * np.pi)),  # l = 1; m = 0
+        #     np.sqrt(3.0 / (4.0 * np.pi))  # l = 1; m = 1
+        # ]
 
-        if raw_ is not None:
-            # sh_coef = raw_[..., -12:]
-            # sh_coef = [0.112468645, 0.000387015840, -0.000640209531, 0.181979418, 0.112468645, 0.000387015840, -
-            #           0.000640209531, 0.181979418, 0.112468645, 0.000387015840, -0.000640209531, 0.181979418] # area_right
-            # sh_coef = [0.113404416, 0.000178174669, -0.000886920141, 0.183451623, 0.113404416, 0.000178174669, -
-            #            0.000886920141, 0.183451623, 0.113404416, 0.000178174669, -0.000886920141, 0.183451623] # area_left
-            # sh_coef = [0.113704570, -0.000507348042, 0.183912858, -8.44246679e-05, 0.113704570, -0.000507348042,
-            #            0.183912858, -8.44246679e-05, 0.113704570, -0.000507348042, 0.183912858, -8.44246679e-05] # area_front
-            sh_coef = [0.213704570, 0.283912858, -0.000507348042, -8.44246679e-05, 0.213704570, -0.283912858, -
-                       0.000507348042, -8.44246679e-05, 0.213704570, -0.283912858, -0.000507348042, -8.44246679e-05]  # area_front_switch
-            # sh_coef = [0.112574577, 0.000413807342, -0.182193324, 0.000330153387, 0.112574577, 0.000413807342,
-            #            -0.182193324, 0.000330153387, 0.112574577, 0.000413807342, -0.182193324, 0.000330153387] # area_back
-            # sh_coef = [0.719291210, -0.0347954370, 0.126413971, -0.0953400061, 0.780129194, -0.0391526185,
-            #            0.103076041, -0.0732670426, 0.745780885, -0.00687278993, 0.0546571091, -0.0373421051] # sunrise
-            sh_parm = tf.cast(sh_parm, tf.float32)
-            intensity = 8
-            sh_coef[0] = sh_coef[0] / sh_parm[0] * intensity
-            sh_coef[1] = sh_coef[1] / sh_parm[1] * intensity
-            sh_coef[2] = sh_coef[2] / sh_parm[2] * intensity
-            sh_coef[3] = sh_coef[3] / sh_parm[3] * intensity
-            sh_coef[4] = sh_coef[4] / sh_parm[0] * intensity
-            sh_coef[5] = sh_coef[5] / sh_parm[1] * intensity
-            sh_coef[6] = sh_coef[6] / sh_parm[2] * intensity
-            sh_coef[7] = sh_coef[7] / sh_parm[3] * intensity
-            sh_coef[8] = sh_coef[8] / sh_parm[0] * intensity
-            sh_coef[9] = sh_coef[9] / sh_parm[1] * intensity
-            sh_coef[10] = sh_coef[10] / sh_parm[2] * intensity
-            sh_coef[11] = sh_coef[11] / sh_parm[3] * intensity
-            sh_coef = tf.broadcast_to(sh_coef, raw.shape.as_list()[
-                                      :2] + [len(sh_coef)], tf.float32)
-        else:
-            sh_coef = raw[..., 4:-1]  # [N_rays, N_samples, 12]
+        # if raw_ is not None:
+        #     # sh_coef = raw_[..., -12:]
+        #     # sh_coef = [0.112468645, 0.000387015840, -0.000640209531, 0.181979418, 0.112468645, 0.000387015840, -
+        #     #           0.000640209531, 0.181979418, 0.112468645, 0.000387015840, -0.000640209531, 0.181979418] # area_right
+        #     # sh_coef = [0.113404416, 0.000178174669, -0.000886920141, 0.183451623, 0.113404416, 0.000178174669, -
+        #     #            0.000886920141, 0.183451623, 0.113404416, 0.000178174669, -0.000886920141, 0.183451623] # area_left
+        #     # sh_coef = [0.113704570, -0.000507348042, 0.183912858, -8.44246679e-05, 0.113704570, -0.000507348042,
+        #     #            0.183912858, -8.44246679e-05, 0.113704570, -0.000507348042, 0.183912858, -8.44246679e-05] # area_front
+        #     sh_coef = [0.213704570, 0.283912858, -0.000507348042, -8.44246679e-05, 0.213704570, -0.283912858, -
+        #                0.000507348042, -8.44246679e-05, 0.213704570, -0.283912858, -0.000507348042, -8.44246679e-05]  # area_front_switch
+        #     # sh_coef = [0.112574577, 0.000413807342, -0.182193324, 0.000330153387, 0.112574577, 0.000413807342,
+        #     #            -0.182193324, 0.000330153387, 0.112574577, 0.000413807342, -0.182193324, 0.000330153387] # area_back
+        #     # sh_coef = [0.719291210, -0.0347954370, 0.126413971, -0.0953400061, 0.780129194, -0.0391526185,
+        #     #            0.103076041, -0.0732670426, 0.745780885, -0.00687278993, 0.0546571091, -0.0373421051] # sunrise
+        #     sh_parm = tf.cast(sh_parm, tf.float32)
+        #     intensity = 8
+        #     sh_coef[0] = sh_coef[0] / sh_parm[0] * intensity
+        #     sh_coef[1] = sh_coef[1] / sh_parm[1] * intensity
+        #     sh_coef[2] = sh_coef[2] / sh_parm[2] * intensity
+        #     sh_coef[3] = sh_coef[3] / sh_parm[3] * intensity
+        #     sh_coef[4] = sh_coef[4] / sh_parm[0] * intensity
+        #     sh_coef[5] = sh_coef[5] / sh_parm[1] * intensity
+        #     sh_coef[6] = sh_coef[6] / sh_parm[2] * intensity
+        #     sh_coef[7] = sh_coef[7] / sh_parm[3] * intensity
+        #     sh_coef[8] = sh_coef[8] / sh_parm[0] * intensity
+        #     sh_coef[9] = sh_coef[9] / sh_parm[1] * intensity
+        #     sh_coef[10] = sh_coef[10] / sh_parm[2] * intensity
+        #     sh_coef[11] = sh_coef[11] / sh_parm[3] * intensity
+        #     sh_coef = tf.broadcast_to(sh_coef, raw.shape.as_list()[
+        #                               :2] + [len(sh_coef)], tf.float32)
+        # else:
+            # sh_coef = raw[..., 4:-1]  # [N_rays, N_samples, 12]
             # sh_coef = tf.math.sigmoid(raw[..., -12:])*2 - 1  # [N_rays, N_samples, 12]
 
-        sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
-                          :2] + [len(sh_parm)]), tf.float32)
-        # [N_rays, N_samples, 4]
-        sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
-        # [N_rays, N_samples, 4]
-        sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
-        # sh_coef_g = tf.multiply(sh_coef[..., :4], sh_parm)
-        # [N_rays, N_samples, 4]
-        sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
-        # sh_coef_b = tf.multiply(sh_coef[..., :4], sh_parm)
-        sh_coef_out = tf.stack([sh_coef_r, sh_coef_g, sh_coef_b], axis=-1)
+        # sh_parm = tf.cast(tf.broadcast_to(sh_parm, sh_coef.shape.as_list()[
+        #                   :2] + [len(sh_parm)]), tf.float32)
+        # # [N_rays, N_samples, 4]
+        # sh_coef_r = tf.multiply(sh_coef[..., :4], sh_parm)
+        # # [N_rays, N_samples, 4]
+        # sh_coef_g = tf.multiply(sh_coef[..., 4:-4], sh_parm)
+        # # [N_rays, N_samples, 4]
+        # sh_coef_b = tf.multiply(sh_coef[..., -4:], sh_parm)
+        # sh_coef_out = tf.stack([sh_coef_r, sh_coef_g, sh_coef_b], axis=-1)
         # [N_rays, N_samples, 4, 3]
 
         # Get spherical harmonics normals
-        sh_norm = -rays_d / \
-            tf.linalg.norm(rays_d, axis=-1, keepdims=True)  # normalization
-        sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[
-                                  :2] + [3])  # [N_rays, 3] -> [N_rays, N_sample, 3]
-        sh_norm = tf.concat([tf.broadcast_to(
-            [1.0], sh_norm[..., :1].shape), sh_norm], axis=-1)  # [N_rays, N_sample, 3] -> [N_rays, N_sample, 4]
+        # sh_norm = -rays_d / \
+        #     tf.linalg.norm(rays_d, axis=-1, keepdims=True)  # normalization
+        # sh_norm = tf.broadcast_to(sh_norm[..., None, :], sh_coef.shape.as_list()[
+        #                           :2] + [3])  # [N_rays, 3] -> [N_rays, N_sample, 3]
+        # sh_norm = tf.concat([tf.broadcast_to(
+        #     [1.0], sh_norm[..., :1].shape), sh_norm], axis=-1)  # [N_rays, N_sample, 3] -> [N_rays, N_sample, 4]
 
         # Get spherical harmonics lighting
-        sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm),
-                             axis=2)  # [N_rays, N_samples]
-        sh_g = tf.reduce_sum(tf.multiply(sh_coef_g, sh_norm), axis=2)
-        sh_b = tf.reduce_sum(tf.multiply(sh_coef_b, sh_norm), axis=2)
-        sh = tf.stack([sh_r, sh_g, sh_b], axis=-
-                      1)  # [N_rays, N_samples, 3]
+        # sh_r = tf.reduce_sum(tf.multiply(sh_coef_r, sh_norm),
+        #                      axis=2)  # [N_rays, N_samples]
+        # sh_g = tf.reduce_sum(tf.multiply(sh_coef_g, sh_norm), axis=2)
+        # sh_b = tf.reduce_sum(tf.multiply(sh_coef_b, sh_norm), axis=2)
+        # sh = tf.stack([sh_r, sh_g, sh_b], axis=-
+        #               1)  # [N_rays, N_samples, 3]
 
         # Extract specular coefficients
-        specular = tf.math.sigmoid(raw[..., -1]) # [N_rays, N_samples]
+        # specular = tf.math.sigmoid(raw[..., -1]) # [N_rays, N_samples]
 
-        # rgb = tf.multiply(albedo, sh)  # [N_rays, N_samples, 3]
-        rgb = tf.multiply(albedo, sh) + specular[..., None] * sh  # [N_rays, N_samples, 3]
+        rgb = albedo
+        # rgb = tf.multiply(albedo, sh) + specular[..., None] * sh  # [N_rays, N_samples, 3]
         # the specular of skin is around 0.35
 
         # Add noise to model's predictions for density. Can be used to
@@ -246,10 +244,10 @@ def render_rays(ray_batch,
             weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
 
         # Computed weighted albedo & spherical harmonics of each sample along each ray.
-        albedo_map = tf.reduce_sum(
-            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
-        sh_map = tf.reduce_sum(weights[..., None] * sh, axis=-2)  # [N_rays, 3]
-        spec_map = tf.reduce_sum(weights * specular, axis=-1) # [N_ray]
+        # albedo_map = tf.reduce_sum(
+        #     weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+        # sh_map = tf.reduce_sum(weights[..., None] * sh, axis=-2)  # [N_rays, 3]
+        # spec_map = tf.reduce_sum(weights * specular, axis=-1) # [N_ray]
         # sh_coef_out = tf.reduce_sum(
         #     weights[..., None, None] * sh_coef_out, axis=-3)  # [N_ray, 4, 3]
 
@@ -268,7 +266,203 @@ def render_rays(ray_batch,
             rgb_map = rgb_map + (1.-acc_map[..., None])
 
         # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
-        return rgb_map, albedo_map, weights
+        return rgb_map, weights
+
+    def raws2outputs(raws, z_vals, rays_d):
+        """Transforms model's predictions to semantically meaningful values.
+
+        Args:
+          raw: [num_rays, num_samples along ray, 4]. Prediction from model.
+          z_vals: [num_rays, num_samples along ray]. Integration time.
+          rays_d: [num_rays, 3]. Direction of each ray.
+
+        Returns:
+          rgb_map: [num_rays, 3]. Estimated RGB color of a ray.
+          disp_map: [num_rays]. Disparity map. Inverse of depth map.
+          acc_map: [num_rays]. Sum of weights along each ray.
+          weights: [num_rays, num_samples]. Weights assigned to each sampled color.
+          depth_map: [num_rays]. Estimated distance to object.
+        """
+        # Function for computing density from model prediction. This value is
+        # strictly between [0, 1].
+        def raw2alpha(raw, dists, act_fn=tf.nn.relu): return 1.0 - \
+            tf.exp(-act_fn(raw) * dists)
+
+        raw = raws['raw']
+        raw_posx = raws['raw_posx']
+        raw_posy = raws['raw_posy']
+        raw_posz = raws['raw_posz']
+        # raw_negx = raws['raw_negx']
+        # raw_negy = raws['raw_negy']
+        # raw_negz = raws['raw_negz']
+        # raw_material = raws['raw_material']
+
+        # Compute 'distance' (in time) between each integration time along a ray.
+        dists = z_vals[..., 1:] - z_vals[..., :-1]
+
+        # The 'distance' from the last integration time is infinity.
+        dists = tf.concat(
+            [dists, tf.broadcast_to([1e10], dists[..., :1].shape)],
+            axis=-1)  # [N_rays, N_samples]
+
+        # Multiply each distance by the norm of its corresponding direction ray
+        # to convert to real world distance (accounts for non-unit directions).
+        dists = dists * tf.linalg.norm(rays_d[..., None, :], axis=-1)
+
+        # Extract albedo of each sample position along each ray.
+        rgb = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+
+        # Add noise to model's predictions for density. Can be used to
+        # regularize network during training (prevents floater artifacts).
+        noise = 0.
+        if raw_noise_std > 0.:
+            noise = tf.random.normal(raw[..., 3].shape) * raw_noise_std
+
+        # Predict density of each sample along each ray. Higher values imply
+        # higher likelihood of being absorbed at this point.
+        alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
+        # alpha_posx = raw2alpha(raw_posx[..., 3] + noise, dists)
+        # alpha_posy = raw2alpha(raw_posy[..., 3] + noise, dists)
+        # alpha_posz = raw2alpha(raw_posz[..., 3] + noise, dists)
+        # alpha_negx = raw2alpha(raw_negx[..., 3] + noise, dists)
+        # alpha_negy = raw2alpha(raw_negy[..., 3] + noise, dists)
+        # alpha_negz = raw2alpha(raw_negz[..., 3] + noise, dists)
+
+        # Compute weight for RGB of each sample along each ray.  A cumprod() is
+        # used to express the idea of the ray not having reflected up to this
+        # sample yet.
+        # [N_rays, N_samples]
+        weights = alpha * \
+            tf.math.cumprod(1.-alpha + 1e-10, axis=-1, exclusive=True)
+        # weights_posx = alpha_posx * tf.math.cumprod(1.-alpha_posx + 1e-10, axis=-1, exclusive=True)
+        # weights_posy = alpha_posy * tf.math.cumprod(1.-alpha_posy + 1e-10, axis=-1, exclusive=True)
+        # weights_posz = alpha_posz * tf.math.cumprod(1.-alpha_posz + 1e-10, axis=-1, exclusive=True)
+        # weights_negx = alpha_negx * tf.math.cumprod(1.-alpha_negx + 1e-10, axis=-1, exclusive=True)
+        # weights_negy = alpha_negy * tf.math.cumprod(1.-alpha_negy + 1e-10, axis=-1, exclusive=True)
+        # weights_negz = alpha_negz * tf.math.cumprod(1.-alpha_negz + 1e-10, axis=-1, exclusive=True)
+
+        # Estimated depth map is expected distance.
+        # depth_map = tf.reduce_sum(weights * z_vals, axis=-1) # [N_rays,]
+        # depth_map_posx = tf.reduce_sum(weights_posx * z_vals, axis=-1)
+        # depth_map_posy = tf.reduce_sum(weights_posy * z_vals, axis=-1)
+
+        # https://stackoverflow.com/questions/53350391/surface-normal-calculation-from-depth-map-in-python normal computation
+        # https://answers.opencv.org/question/82453/calculate-surface-normals-from-depth-image-using-neighboring-pixels-cross-product/
+        # zy, zx = np.gradient(depth_map)
+        # zx = np.gradient(depth_map, depth_map_posx)
+        # zy = np.gradient(depth_map, depth_map_posy)
+        # norm = np.dstack((-zx, -zy, np.ones_like(depth_map)))
+        # norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6) # [N_rays, N_samples, 3]
+
+        # compute normal
+        dens = tf.maximum(raw[..., 3], 0.)
+        dens_posx = tf.maximum(raw_posx[..., 3], 0.)
+        dens_posy = tf.maximum(raw_posy[..., 3], 0.)
+        dens_posz = tf.maximum(raw_posz[..., 3], 0.)
+        # dens_negx = tf.maximum(raw_negx[..., -1], 0.)
+        # dens_negy = tf.maximum(raw_negy[..., -1], 0.)
+        # dens_negz = tf.maximum(raw_negz[..., -1], 0.)
+
+        norm_x = dens - dens_posx
+        norm_y = dens - dens_posy
+        norm_z = dens - dens_posz
+        # norm_x = (dens - dens_posx) + (dens_negx - dens)
+        # norm_y = (dens - dens_posy) + (dens_negy - dens)
+        # norm_z = (dens - dens_posz) + (dens_negz - dens)
+
+        norm = tf.stack([norm_x, norm_y, norm_z], axis=-1)
+        norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
+        # norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
+        # norm_x2, norm_y2, norm_z2 = norm_x*norm_x, norm_y*norm_y, norm_z*norm_z
+
+        # Extract sphereical harmoncis coefficients
+        # sh_basis = [
+        #     # level 0
+        #     tf.cast(tf.broadcast_to(1.0 / 2.0 * np.sqrt(1.0 / np.pi), norm_x.shape.as_list()), tf.float32), # l = 0; m = 0
+        #     # level 1
+        #     np.sqrt(3.0 / (4.0 * np.pi)) * norm_y,  # l = 1; m = -1
+        #     np.sqrt(3.0 / (4.0 * np.pi)) * norm_z,  # l = 1; m = 0
+        #     np.sqrt(3.0 / (4.0 * np.pi)) * norm_x,  # l = 1; m = 1
+        #     # level 2
+        #     1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_y,
+        #     1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_z * norm_y,
+        #     1.0 / 4.0 * np.sqrt(5.0 / np.pi)  * (-norm_x2-norm_y2 + 2.0*norm_z2),
+        #     1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_z,
+        #     1.0 / 4.0 * np.sqrt(15.0 / np.pi) * norm_x2 - norm_y2,
+        #     # level 3
+        #     1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (3.0 * norm_x2 - norm_y2) * norm_y,
+        #     1.0 / 2.0 * np.sqrt(105.0 / np.pi)        * norm_x * norm_z * norm_y,
+        #     1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_y * (5.0*norm_z2 - norm_x2 - norm_y2),
+        #     1.0 / 4.0 * np.sqrt(7.0 / np.pi)          * norm_z * (1.5*norm_z2 - 3.0*norm_x2 - 3.0*norm_y2),
+        #     1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_x * (5.0*norm_z2 - norm_x2 - norm_y2),
+        #     1.0 / 4.0 * np.sqrt(105.0 / np.pi)        * (norm_x2 - norm_y2) * norm_z,
+        #     1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (norm_x2 - 3.0*norm_y2) * norm_x
+        # ]
+        # sh_basis = tf.stack(sh_basis, axis=-1) # [N_rays, N_samples, 16]
+        # sh = tf.broadcast_to(sh, sh_basis.shape.as_list()[:2] + list(sh.shape)) # [N_rays, N_samples, 16, 3]
+        # sh_light = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
+
+        # # for direct light
+        # down_step = 100
+        # light_probe = light_probe[::down_step,::down_step,:] # [h,w,3]
+
+        # # get uv coordinates
+        # h, w, _ = light_probe.shape
+        # u = np.arange(w)/w
+        # v = np.arange(h)/h
+
+        # # get spherical coordinates
+        # r = 1
+        # rot = 0.25
+        # theta = v * np.pi # 0 to pi
+        # phi = (u+rot) * 2*np.pi # -pi to pi
+
+        # # spherical coordinates to cartesian coordinates
+        # X = r * np.sin(theta[..., None]) * np.cos(phi) # [h,w]
+        # Y = r * np.sin(theta[..., None]) * np.sin(phi) # [h,w]
+        # Z = r * np.cos(theta[..., None]) * np.ones(phi.shape) # [h,w]
+        # x = np.reshape(X, -1)
+        # y = np.reshape(Y, -1)
+        # z = np.reshape(Z, -1)
+
+        # # map uv to pixel scale
+        # # m = np.ceil(u*w)
+        # # n = np.ceil(v*h)
+
+        # # get color from light probe using 
+        # l_power = 30.0
+        # sh_power = 1.0
+        # l_dir = np.stack([x, y, z], axis=-1).astype(np.float32) # [h*w,3]
+        # l_weight = np.sin(theta) # [h,]
+        # l_color = np.reshape(light_probe * l_weight[:, None, None], (-1,3)).astype(np.float32) # [h*w,3]
+        # nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
+        # light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
+
+        # # rgb = albedo * light_diffuse + sh_light
+        # albedo = (rgb - sh_power * sh_light) / (l_power * light_diffuse + 1e-5)
+
+        # Computed weighted color of each sample along each ray.
+        rgb_map = tf.reduce_sum(
+            weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
+        # albedo_map = tf.reduce_sum(
+        #     weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+        # diffuse_map = tf.reduce_sum(
+        #     weights[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
+        norm_map = tf.reduce_sum(
+            weights[..., None] * norm, axis=-2)  # [N_rays, 3]
+        # sh_light_map = tf.reduce_sum(
+        #     weights[..., None] * sh_light, axis=-2)  # [N_rays, 3]
+
+        # Sum of weights along each ray. This value is in [0, 1] up to numerical error.
+        acc_map = tf.reduce_sum(weights, -1)
+
+        # To composite onto a white background, use the accumulated alpha map.
+        if white_bkgd:
+            rgb_map = rgb_map + (1.-acc_map[..., None])
+
+        # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
+        # return rgb_map, albedo_map, diffuse_map, norm_map, sh_light_map, depth_map, weights  
+        return rgb_map, norm_map, weights  
 
     ###############################
     # batch size
@@ -313,19 +507,20 @@ def render_rays(ray_batch,
     # Evaluate model at each point.
     # [N_rays, N_samples, 4] -> [N_rays, N_samples, 8]
     raw = network_query_fn(pts, viewdirs, sh, network_fn)
-    if network_fn_ is not None:
-        raw_ = network_query_fn_(pts, viewdirs, sh, network_fn_)
-        # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
-        #     raw, z_vals, rays_d, raw_)
-        rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
-    else:
-        # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
-        #     raw, z_vals, rays_d)
-        rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
+    # if network_fn_ is not None:
+    #     raw_ = network_query_fn_(pts, viewdirs, sh, network_fn_)
+    #     # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+    #     #     raw, z_vals, rays_d, raw_)
+    #     rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
+    # else:
+    #     # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+    #     #     raw, z_vals, rays_d)
+    #     rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
+    rgb_map_0, weights = raw2outputs(raw, z_vals, rays_d)
 
     if N_importance > 0:
         # rgb_map_0, albedo_0, sh_0, spec_0, sh_coef_0, disp_map_0, acc_map_0 = rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map
-        rgb_map_0, albedo_0 = rgb_map, albedo_map
+        # rgb_map_0, albedo_0 = rgb_map, albedo_map
 
         # Obtain additional integration times to evaluate based on the weights
         # assigned to colors in the coarse model.
@@ -336,26 +531,43 @@ def render_rays(ray_batch,
 
         # Obtain all points to evaluate color, density at.
         z_vals = tf.sort(tf.concat([z_vals, z_samples], -1), -1)
-        pts = rays_o[..., None, :] + rays_d[..., None, :] * \
-            z_vals[..., :, None]  # [N_rays, N_samples + N_importance, 3]
+
+        delta = tf.reduce_mean(far-near).numpy() / ((N_samples + N_importance) * 4)
+        pts_o = rays_o[..., None, :]
+        pts_d = rays_d[..., None, :]
+        pts_z = z_vals[..., :, None]
+        offset_x = tf.cast(tf.broadcast_to([delta, 0, 0], pts_o.shape.as_list()), tf.float32)
+        offset_y = tf.cast(tf.broadcast_to([0, delta, 0], pts_o.shape.as_list()), tf.float32)
+        offset_z = tf.cast(tf.broadcast_to([0, 0, delta], pts_o.shape.as_list()), tf.float32)
+        pts = pts_o + pts_d * z_vals[..., :, None]  # [N_rays, N_samples + N_importance, 3]
+        pts_posx = pts_o + offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_posy = pts_o + offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        pts_posz = pts_o + offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
 
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
         raw = network_query_fn(pts, viewdirs, sh, run_fn)
+        raws = {}
+        raws['raw'] = raw
+        raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, sh, run_fn)
+        raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, sh, run_fn)
+        raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, sh, run_fn)
         if network_fn_ is not None:
-            run_fn_ = network_fn_ if network_fine_ is None else network_fine_
-            raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
-            # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
-            #     raw, z_vals, rays_d, raw_)
-            rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
+            # run_fn_ = network_fn_ if network_fine_ is None else network_fine_
+            # raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
+            # # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
+            # #     raw, z_vals, rays_d, raw_)
+            # rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d, raw_)
+            pass
         else:
             # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
             #     raw, z_vals, rays_d)
-            rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
+            # rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
+            rgb_map, norm_map, weights = raws2outputs(raws, z_vals, rays_d)
 
     # ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
     #        'disp_map': disp_map, 'acc_map': acc_map}
-    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map}
+    ret = {'rgb_map': rgb_map, 'norm_map': norm_map}
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
@@ -467,7 +679,7 @@ def render(H, W, focal,
 
     # k_extract = ['rgb_map', 'albedo_map', 'sh_map', 'spec_map',
     #              'sh_coef_out', 'disp_map', 'acc_map']
-    k_extract = ['rgb_map', 'albedo_map']
+    k_extract = ['rgb_map', 'norm_map']
     ret_list = [all_ret[k] for k in k_extract]
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
@@ -489,7 +701,7 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
     #     hwfs = hwfs[np.newaxis, ...]
 
     rgbs = []
-    albedos = []
+    norms = []
     # sh_lights = []
     # specs = []
     # disps = []
@@ -522,11 +734,11 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
             # render
         # rgb, albedo, sh_light, spec, _, disp, acc, _ = render(
         #     H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
-        rgb, albedo, _ = render(H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
+        rgb, norm, _ = render(H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, **render_kwargs)
 
         #
         rgbs.append(rgb.numpy())
-        albedos.append(albedo.numpy())
+        norms.append(norm.numpy())
         # sh_lights.append(sh_light.numpy())
         # specs.append(spec.numpy())
         # disps.append(disp.numpy())
@@ -540,22 +752,22 @@ def render_path(render_poses, hwfs, shs, chunk, render_kwargs, names=None, gt_im
 
         if savedir is not None:
             rgb8 = to8b(rgbs[-1])
-            albedo8 = to8b(albedos[-1])
+            norm8 = to8b(norms[-1])
             # sh_light8 = to8b(sh_lights[-1])
             # spec8 = to8b(specs[-1])
             # filename = os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i]))
             imageio.imwrite(os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i])), rgb8)
-            imageio.imwrite(os.path.join(savedir, '{:03d}_{}_albedo.png'.format(i, names[i])), albedo8)
+            imageio.imwrite(os.path.join(savedir, '{:03d}_{}_norm.png'.format(i, names[i])), norm8)
             # imageio.imwrite(os.path.join(savedir, '{:03d}_{}_sh_light.png'.format(i, names[i])), sh_light8)
             # imageio.imwrite(os.path.join(savedir, '{:03d}_{}_spec.png'.format(i, names[i])), spec8)
 
     rgbs = np.stack(rgbs, 0)
-    albedos = np.stack(albedos, 0)
+    norms = np.stack(norms, 0)
     # sh_lights = np.stack(sh_lights, 0)
     # disps = np.stack(disps, 0)
 
     # return rgbs, albedos, sh_lights, disps
-    return rgbs, albedos
+    return rgbs, norms
 
 
 def create_nerf(args):
@@ -845,7 +1057,7 @@ def train():
 
         # set near and far value, real distance
         near = 100.
-        far = 400.
+        far = 250.
 
         # set white_bkgd if alpha channel is available
         if args.white_bkgd:
@@ -1047,7 +1259,7 @@ def train():
             # rgb, albedo, sh_light, spec, sh_coef, disp, acc, extras = render(
             #     H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh,
             #     verbose=i < 10, retraw=True, **render_kwargs_train)
-            rgb, albedo, extras = render(
+            rgb, _, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
@@ -1196,7 +1408,7 @@ def train():
 
                 # rgb, albedo, sh_light, spec, _, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh,
                 #                                                      **render_kwargs_test)
-                rgb, albedo, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, **render_kwargs_test)
+                rgb, norm, extras = render(H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
@@ -1207,7 +1419,7 @@ def train():
                 imageio.imwrite(os.path.join(
                     testimgdir, '{:06d}_{}.png'.format(i, name)), to8b(rgb))
                 imageio.imwrite(os.path.join(
-                    testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
+                    testimgdir, '{:06d}_{}_norm.png'.format(i, name)), to8b(norm))
                 # imageio.imwrite(os.path.join(
                 #     testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
                 # imageio.imwrite(os.path.join(
@@ -1216,6 +1428,7 @@ def train():
                 with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
 
                     tf.contrib.summary.image('rgb', to8b(rgb)[tf.newaxis])
+                    tf.contrib.summary.image('norm', to8b(norm)[tf.newaxis])
                     # tf.contrib.summary.image(
                     #     'disp', disp[tf.newaxis, ..., tf.newaxis])
                     # tf.contrib.summary.image(
