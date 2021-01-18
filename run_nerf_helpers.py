@@ -111,9 +111,6 @@ def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, input_ch_sh=12, ou
 
     if use_viewdirs:
         alpha_out = dense(1, act=None)(outputs)
-        # used for output spherical harmonics coefficients
-        # sh_out = dense(12, act=None)(outputs)
-        # specular_out = dense(1, act=None)(outputs)
         bottleneck = dense(256, act=None)(outputs)
         inputs_viewdirs = tf.concat([bottleneck, inputs_views], -1)  # concat viewdirs
         # inputs_viewdirs_sh = tf.concat([bottleneck, inputs_views, inputs_sh], -1)  # concat viewdirs and sh
@@ -124,8 +121,13 @@ def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, input_ch_sh=12, ou
         for i in range(1):
             outputs = dense(W//2)(outputs)
         outputs = dense(3, act=None)(outputs)
-        outputs = tf.concat([outputs, alpha_out], -1)
-        # outputs = tf.concat([outputs, alpha_out, sh_out, specular_out], -1)
+        # used for output spherical harmonics coefficients
+        norm_out = dense(3, act=None)(outputs)
+        spec_out = dense(1, act=None)(outputs)
+        lt_pw_diffuse_out = dense(1, act=None)(outputs)
+        lt_pw_sh_out = dense(1, act=None)(outputs)
+        # outputs = tf.concat([outputs, alpha_out], -1)
+        outputs = tf.concat([outputs, alpha_out, norm_out, spec_out, lt_pw_diffuse_out, lt_pw_sh_out], -1)
     else:
         outputs = dense(output_ch, act=None)(outputs)
 
