@@ -1047,17 +1047,17 @@ def train():
 
         # set near and far value, real distance
         # model 0 near 100 far 400
-        near = 40.
-        far = 80.
+        near = 35.
+        far = 85.
 
         # load light probe here for now
-        # light_probe = imageio.imread(args.datadir+'/light/equirectangular.exr')
-        # gain = 1.0
-        # gamma = 1.5
-        # light_probe = gain * (light_probe ** gamma) # gamma correction, gamma 2.2 is youtube default gamma
-        # light_probe = np.minimum(light_probe, 10.0) # filter way brighter light samples
+        light_probe = imageio.imread(args.datadir+'/light/equirectangular.exr')
+        gain = 1.0
+        gamma = 1.5
+        light_probe = gain * (light_probe ** gamma) # gamma correction, gamma 2.2 is youtube default gamma
+        light_probe = np.minimum(light_probe, 10.0) # filter way brighter light samples
         
-        light_probe = imageio.imread('/glab2/data/Users/jyang/data/nerf_synthesic/model_0_sh_21/light/equirectangular.exr')
+        # light_probe = imageio.imread('/glab2/data/Users/jyang/data/nerf_synthesic/model_0_sh_21/light/equirectangular.exr')
 
         # set white_bkgd if alpha channel is available
         if args.white_bkgd:
