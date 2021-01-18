@@ -536,22 +536,22 @@ def render_rays(ray_batch,
         pts_o = rays_o[..., None, :]
         pts_d = rays_d[..., None, :]
         pts_z = z_vals[..., :, None]
-        offset_x = tf.cast(tf.broadcast_to([delta, 0, 0], pts_o.shape.as_list()), tf.float32)
-        offset_y = tf.cast(tf.broadcast_to([0, delta, 0], pts_o.shape.as_list()), tf.float32)
-        offset_z = tf.cast(tf.broadcast_to([0, 0, delta], pts_o.shape.as_list()), tf.float32)
+        # offset_x = tf.cast(tf.broadcast_to([delta, 0, 0], pts_o.shape.as_list()), tf.float32)
+        # offset_y = tf.cast(tf.broadcast_to([0, delta, 0], pts_o.shape.as_list()), tf.float32)
+        # offset_z = tf.cast(tf.broadcast_to([0, 0, delta], pts_o.shape.as_list()), tf.float32)
         pts = pts_o + pts_d * z_vals[..., :, None]  # [N_rays, N_samples + N_importance, 3]
-        pts_posx = pts_o + offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
-        pts_posy = pts_o + offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
-        pts_posz = pts_o + offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        # pts_posx = pts_o + offset_x + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        # pts_posy = pts_o + offset_y + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
+        # pts_posz = pts_o + offset_z + pts_d * pts_z  # [N_rays, N_samples + N_importance, 3]
 
         # Make predictions with network_fine.
         run_fn = network_fn if network_fine is None else network_fine
         raw = network_query_fn(pts, viewdirs, sh, run_fn)
         raws = {}
         raws['raw'] = raw
-        raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, sh, run_fn)
-        raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, sh, run_fn)
-        raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, sh, run_fn)
+        # raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, sh, run_fn)
+        # raws['raw_posy'] = network_query_fn(pts_posy, viewdirs, sh, run_fn)
+        # raws['raw_posz'] = network_query_fn(pts_posz, viewdirs, sh, run_fn)
         if network_fn_ is not None:
             # run_fn_ = network_fn_ if network_fine_ is None else network_fine_
             # raw_ = network_query_fn_(pts, viewdirs, sh, run_fn_)
@@ -563,11 +563,13 @@ def render_rays(ray_batch,
             # rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map = raw2outputs(
             #     raw, z_vals, rays_d)
             # rgb_map, albedo_map, weights = raw2outputs(raw, z_vals, rays_d)
-            rgb_map, norm_map, weights = raws2outputs(raws, z_vals, rays_d)
+            # rgb_map, norm_map, weights = raws2outputs(raws, z_vals, rays_d)
+            rgb_map, weights = raw2outputs(raw, z_vals, rays_d)
 
     # ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
     #        'disp_map': disp_map, 'acc_map': acc_map}
-    ret = {'rgb_map': rgb_map, 'norm_map': norm_map}
+    # ret = {'rgb_map': rgb_map, 'norm_map': norm_map}
+    ret = {'rgb_map': rgb_map, 'norm_map': rgb_map}
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
@@ -1056,14 +1058,14 @@ def train():
         i_train, i_val, i_test = i_split
 
         # set near and far value, real distance
-        near = 100.
-        far = 250.
+        near = 35.
+        far = 85.
 
         # set white_bkgd if alpha channel is available
         if args.white_bkgd:
-            pass
+            images = images[..., :3]*images[..., -1:] + (1.-images[..., -1:])
         else:
-            pass
+            images = images[..., :3]
 
     else:
         print('Unknown dataset type', args.dataset_type, 'exiting')
