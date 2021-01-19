@@ -470,8 +470,8 @@ def render_rays(ray_batch,
         sh_light = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
 
         # for direct light
-        down_step = 100
-        light_probe = light_probe[::down_step,::down_step,:] # [h,w,3]
+        # down_step = 100
+        # light_probe = light_probe[::down_step,::down_step,:] # [h,w,3]
 
         # get uv coordinates
         h, w, _ = light_probe.shape

@@ -78,11 +78,17 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
         for frame in meta['frames'][::skip]:
             fname = os.path.join(basedir, frame['file_path'] + '.png')
             imgs.append(imageio.imread(fname))
-            lightProbes.append(imageio.imread(os.path.join(basedir, frame['lightProbe_path'] + '.exr')))
             names.append(os.path.splitext(os.path.basename(fname))[0])
             poses.append(np.array(frame['transform_matrix']))
             hwfs.append(np.array(frame['hwf']))
             shs.append(np.array(frame['sh']))
+
+            gain = 1.0
+            gamma = 1.5
+            light_probe = imageio.imread(os.path.join(basedir, frame['lightProbe_path'] + '.exr'))
+            light_probe = gain * (light_probe ** gamma) # gamma correction, gamma 2.2 is youtube default gamma
+            light_probe = np.minimum(light_probe, 10.0) # filter way brighter light samples
+            lightProbes.append(light_probe)
 
         # type process
         # keep all 4 channels (RGBA)
