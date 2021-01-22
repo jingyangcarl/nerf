@@ -238,9 +238,10 @@ def render_rays(ray_batch,
         lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples, 1]
         lt_pw_sh = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples, 1]
 
-        # lt_pw_diffuse = lt_pw_diffuse[..., None]
-        lt_pw_diffuse = tf.reduce_mean(lt_pw_diffuse)
-        lt_pw_sh = tf.reduce_mean(lt_pw_sh)
+        lt_pw_diffuse = lt_pw_diffuse[..., None]
+        lt_pw_sh = lt_pw_sh[..., None]
+        # lt_pw_diffuse = tf.reduce_mean(lt_pw_diffuse)
+        # lt_pw_sh = tf.reduce_mean(lt_pw_sh)
 
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
         norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
@@ -303,7 +304,7 @@ def render_rays(ray_batch,
         light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
         # rgb = albedo * light_diffuse + light_sh
-        rgb = lt_pw_diffuse * albedo * light_diffuse
+        rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
         # rgb = lt_pw_sh * albedo * light_sh
 
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
@@ -1194,7 +1195,7 @@ def train():
     elif args.dataset_type == 'lightstage':
 
         # load data
-        images, light_probes, names, poses, hwfs, shs, render_poses, i_split = load_lightstage_data(
+        images, light_probes, albedos_gt, normals_gt, names, poses, hwfs, shs, render_poses, i_split = load_lightstage_data(
             basedir=args.datadir, half_res=args.half_res, testskip=args.testskip)
         print('Loaded lightstage', images.shape, poses.shape,
               hwfs.shape, shs.shape, render_poses.shape, args.datadir)
@@ -1219,6 +1220,8 @@ def train():
         # set white_bkgd if alpha channel is available
         if args.white_bkgd:
             images = images[..., :3]*images[..., -1:] + (1.-images[..., -1:])
+            albedos_gt = albedos_gt[..., :3]*albedos_gt[..., -1:] + (1.-albedos_gt[..., -1:])
+            normals_gt = normals_gt[..., :3]*normals_gt[..., -1:] + (1.-normals_gt[..., -1:])
         else:
             images = images[..., :3]
 
@@ -1378,6 +1381,8 @@ def train():
 
             # get traning data
             target = images[img_i]
+            target_albedo = albedos_gt[img_i]
+            target_normal = normals_gt[img_i]
             pose = poses[img_i, :3, :4]
             # sh = shs[img_i, :4, :3]
             sh = shs[img_i, :16, :3]
@@ -1407,13 +1412,15 @@ def train():
                 rays_d = tf.gather_nd(rays_d, select_inds)
                 batch_rays = tf.stack([rays_o, rays_d], 0)
                 target_s = tf.gather_nd(target, select_inds)
+                target_albedo = tf.gather_nd(target_albedo, select_inds)
+                target_normal = tf.gather_nd(target_normal, select_inds)
 
         #####  Core optimization loop  #####
 
         with tf.GradientTape() as tape:
 
             # Make predictions for color, disparity, accumulated opacity.
-            rgb, _, _, _, _, _, extras = render(
+            rgb, albedo, _, normal, _, _, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh, light_probe=light_probe,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
@@ -1467,9 +1474,11 @@ def train():
 
             # Compute MSE loss between predicted and true RGB.
             img_loss = img2mse(rgb, target_s)
+            albedo_loss = img2mse(albedo, target_albedo)
+            normal_loss = img2mse(normal, target_normal)
             # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            loss = img_loss
+            loss = img_loss + albedo_loss + normal_loss
             psnr = mse2psnr(img_loss)
 
             # Add MSE loss for coarse-grained model

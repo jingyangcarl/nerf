@@ -1,4 +1,4 @@
-expname = model_1_partial_test_2
+expname = model_1_partial_test
 basedir = ./logs
 datadir = /glab2/data/Users/jyang/data/nerf_synthesic/model_1_partial
 dataset_type = lightstage
