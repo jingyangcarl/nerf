@@ -84,7 +84,7 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
             shs.append(np.array(frame['sh']))
 
             gain = 1.0
-            gamma = 1.5
+            gamma = 1.0
             light_probe = imageio.imread(os.path.join(basedir, frame['lightProbe_path'] + '.exr'))
             light_probe = gain * (light_probe ** gamma) # gamma correction, gamma 2.2 is youtube default gamma
             light_probe = np.minimum(light_probe, 10.0) # filter way brighter light samples

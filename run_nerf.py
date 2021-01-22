@@ -233,12 +233,16 @@ def render_rays(ray_batch,
         # higher likelihood of being absorbed at this point.
         alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
     
-        norm = tf.math.sigmoid(raw[..., 4:7])  # [N_rays, N_samples, 3]
+        norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
         sepc = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples, 1]
         lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples, 1]
-        lt_pw_sh_out = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples, 1]
+        lt_pw_sh = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples, 1]
 
-        
+        # lt_pw_diffuse = lt_pw_diffuse[..., None]
+        lt_pw_diffuse = tf.reduce_mean(lt_pw_diffuse)
+        lt_pw_sh = tf.reduce_mean(lt_pw_sh)
+
+        norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
         norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
         norm_x2, norm_y2, norm_z2 = norm_x*norm_x, norm_y*norm_y, norm_z*norm_z
 
@@ -271,8 +275,8 @@ def render_rays(ray_batch,
 
 
         # for direct light
-        down_step = 100
-        light_probe = light_probe[::down_step,::down_step,:] # [h,w,3]
+        # down_step = 100
+        # light_probe = light_probe[::down_step,::down_step,:] # [h,w,3]
 
         # get uv coordinates
         h, w, _ = light_probe.shape
@@ -298,7 +302,9 @@ def render_rays(ray_batch,
         nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
         light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
-        rgb = albedo * light_diffuse + light_sh
+        # rgb = albedo * light_diffuse + light_sh
+        rgb = lt_pw_diffuse * albedo * light_diffuse
+        # rgb = lt_pw_sh * albedo * light_sh
 
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
         # used to express the idea of the ray not having reflected up to this

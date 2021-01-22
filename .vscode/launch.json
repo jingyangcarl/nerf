@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: model 1",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "config_lightstage_partial.txt"
+            ]
+        },
+        {
             "name": "Python: Lightstage 21",
             "type": "python",
             "request": "launch",

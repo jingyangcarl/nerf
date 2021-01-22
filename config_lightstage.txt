@@ -1,4 +1,4 @@
-expname = model_1_test
+expname = model_1_test_sh_1e-4
 basedir = ./logs
 datadir = /glab2/data/Users/jyang/data/nerf_synthesic/model_1
 dataset_type = lightstage
@@ -15,4 +15,5 @@ white_bkgd = True
 
 N_rand = 1024
 chunk = 2048
-lrate = 5e-4
+lrate = 1e-4
+i_img = 1000

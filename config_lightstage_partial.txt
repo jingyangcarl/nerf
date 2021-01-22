@@ -1,4 +1,4 @@
-expname = model_1_partial_test
+expname = model_1_partial_test_2
 basedir = ./logs
 datadir = /glab2/data/Users/jyang/data/nerf_synthesic/model_1_partial
 dataset_type = lightstage
@@ -15,4 +15,7 @@ white_bkgd = True
 
 N_rand = 1024
 chunk = 2048
-lrate = 5e-4
+lrate = 2e-4
+
+testskip = 1
+i_img = 1000
