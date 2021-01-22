@@ -148,5 +148,7 @@ def load_lightstage_data(basedir, half_res=False, testskip=1):
         hwfs[:, 1] = hwfs[:, 1] // 2  # width
         hwfs[:, 2] = hwfs[:, 2] / 2  # focal
         imgs = tf.image.resize_area(imgs, [int(hwfs[0,0]), int(hwfs[0,1])]).numpy()
+        albedos = tf.image.resize_area(albedos, [int(hwfs[0,0]), int(hwfs[0,1])]).numpy()
+        normals = tf.image.resize_area(normals, [int(hwfs[0,0]), int(hwfs[0,1])]).numpy()
 
     return imgs, lightProbes, albedos, normals, names, poses, hwfs, shs, render_poses, i_split

@@ -1478,7 +1478,7 @@ def train():
             normal_loss = img2mse(normal, target_normal)
             # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            loss = img_loss + albedo_loss + normal_loss
+            loss = albedo_loss + normal_loss
             psnr = mse2psnr(img_loss)
 
             # Add MSE loss for coarse-grained model
