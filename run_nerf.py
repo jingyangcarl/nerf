@@ -148,7 +148,7 @@ def render_rays(ray_batch,
         dists = dists * tf.linalg.norm(rays_d[..., None, :], axis=-1)
 
         # Extract albedo of each sample position along each ray.
-        rgb = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+        albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
 
         # Add noise to model's predictions for density. Can be used to
         # regularize network during training (prevents floater artifacts).
@@ -160,6 +160,9 @@ def render_rays(ray_batch,
         # higher likelihood of being absorbed at this point.
         alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
 
+        norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
+        norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
+
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
         # used to express the idea of the ray not having reflected up to this
         # sample yet.
@@ -168,8 +171,10 @@ def render_rays(ray_batch,
             tf.math.cumprod(1.-alpha + 1e-10, axis=-1, exclusive=True)
 
         # Computed weighted color of each sample along each ray.
-        rgb_map = tf.reduce_sum(
-            weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
+        albedo_map = tf.reduce_sum(
+            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+        norm_map = tf.reduce_sum(
+            weights[..., None] * norm, axis=-2)  # [N_rays, 3]
 
         # Estimated depth map is expected distance.
         # depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
@@ -183,10 +188,11 @@ def render_rays(ray_batch,
 
         # To composite onto a white background, use the accumulated alpha map.
         if white_bkgd:
-            rgb_map = rgb_map + (1.-acc_map[..., None])
+            albedo_map = albedo_map + (1.-acc_map[..., None])
+            norm_map = norm_map + (1.-acc_map[..., None])
 
         # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
-        return rgb_map, weights
+        return albedo_map, norm_map, weights
 
     def raw2outputs_test(raw, z_vals, rays_d, sh, light_probe):
         """Transforms model's predictions to semantically meaningful values.
@@ -234,14 +240,17 @@ def render_rays(ray_batch,
         alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
     
         norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
-        sepc = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples, 1]
-        lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples, 1]
-        lt_pw_sh = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples, 1]
+        spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
+        lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
+        lt_pw_sh = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples,]
+        lt_vis_diffuse = tf.nn.relu(raw[..., 10])  # [N_rays, N_samples,]
+        lt_vis_sh = tf.nn.relu(raw[..., 11])  # [N_rays, N_samples,]
 
-        lt_pw_diffuse = lt_pw_diffuse[..., None]
-        lt_pw_sh = lt_pw_sh[..., None]
-        # lt_pw_diffuse = tf.reduce_mean(lt_pw_diffuse)
-        # lt_pw_sh = tf.reduce_mean(lt_pw_sh)
+        spec = spec[..., None]
+        lt_pw_diffuse = tf.reduce_mean(lt_pw_diffuse)
+        lt_pw_sh = tf.reduce_mean(lt_pw_sh)
+        lt_vis_diffuse = lt_vis_diffuse[..., None]
+        lt_vis_sh = lt_vis_sh[..., None]
 
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
         norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
@@ -274,7 +283,6 @@ def render_rays(ray_batch,
         sh = tf.broadcast_to(sh, sh_basis.shape.as_list()[:2] + list(sh.shape)) # [N_rays, N_samples, 16, 3]
         light_sh = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
 
-
         # for direct light
         # down_step = 100
         # light_probe = light_probe[::down_step,::down_step,:] # [h,w,3]
@@ -303,9 +311,20 @@ def render_rays(ray_batch,
         nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
         light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
-        # rgb = albedo * light_diffuse + light_sh
-        rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
-        # rgb = lt_pw_sh * albedo * light_sh
+        lt_diffuse = lt_pw_diffuse * albedo * light_diffuse
+        lt_sh = lt_pw_sh * albedo * light_sh
+        lt_spec = spec * light_diffuse
+        rgb = lt_vis_diffuse * lt_diffuse + lt_vis_sh * lt_sh
+
+        # model_1_sh_*_baseline uses the follow equation
+        # rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
+
+        # try this next 2021/01/22
+        # let network pred visilibity map, which means to what extent can the sample be lighten up by the light point
+        # which decomposes [nonuniformly distributed light power] for both diffuse and sh to a [uniform light power] * [visiblity map]
+        # add to more output channel, vis_diffuse and vis_sh
+
+
 
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
         # used to express the idea of the ray not having reflected up to this
@@ -339,6 +358,10 @@ def render_rays(ray_batch,
         # To composite onto a white background, use the accumulated alpha map.
         if white_bkgd:
             rgb_map = rgb_map + (1.-acc_map[..., None])
+            albedo_map = albedo_map + (1.-acc_map[..., None])
+            diffuse_map = diffuse_map + (1.-acc_map[..., None])
+            norm_map = norm_map + (1.-acc_map[..., None])
+            sh_light_map = sh_light_map + (1.-acc_map[..., None])
 
         return rgb_map, albedo_map, diffuse_map, norm_map, sh_light_map, depth_map, weights
 
@@ -614,7 +637,7 @@ def render_rays(ray_batch,
         #     raw, z_vals, rays_d)
         # rgb_map, albedo_map, diffuse_map, norm_map, sh_light_map, weights = raws2outputs(
         #     raws, z_vals, rays_d, sh, light_probe)
-    rgb_0, weights = raw2outputs(raw, z_vals, rays_d)
+    albedo_0, normal_0, weights = raw2outputs(raw, z_vals, rays_d)
 
     if N_importance > 0:
 
@@ -679,7 +702,8 @@ def render_rays(ray_batch,
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
-        ret['rgb0'] = rgb_0
+        ret['albedo0'] = albedo_0
+        ret['normal0'] = normal_0
         # ret['rgb1'] = rgb_1
         # ret['albedo0'] = albedo_0
         # ret['diffuse0'] = diffuse_0
@@ -1473,23 +1497,26 @@ def train():
             # [N_ray, 4, 3]
 
             # Compute MSE loss between predicted and true RGB.
-            img_loss = img2mse(rgb, target_s)
-            albedo_loss = img2mse(albedo, target_albedo)
-            normal_loss = img2mse(normal, target_normal)
+            loss_img = img2mse(rgb, target_s)
+            loss_albedo = img2mse(albedo, target_albedo)
+            loss_normal = img2mse(normal, target_normal)
             # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            loss = albedo_loss + normal_loss
-            psnr = mse2psnr(img_loss)
+            loss = 2*loss_img + loss_albedo + loss_normal
+            psnr = mse2psnr(loss)
+            # psnr_img = mse2psnr(loss_img)
+            # psnr_albedo = mse2psnr(loss_albedo)
+            # psnr_normal = mse2psnr(loss_normal)
 
             # Add MSE loss for coarse-grained model
-            if 'rgb0' in extras:
-                img_loss0 = img2mse(extras['rgb0'], target_s)
-                loss += img_loss0
-                psnr0 = mse2psnr(img_loss0)
-            # if 'rgb1' in extras:
-            #     img_loss1 = img2mse(extras['rgb1'], target_s)
-            #     loss += 0.75*img_loss1
-            #     psnr1 = mse2psnr(img_loss1)
+            if 'albedo0' in extras:
+                loss_albedo0 = img2mse(extras['albedo0'], target_albedo)
+                loss += loss_albedo0
+                # psnr_albedo0 = mse2psnr(loss_albedo0)
+            if 'normal0' in extras:
+                loss_normal0 = img2mse(extras['normal0'], target_normal)
+                loss += loss_normal0
+                # psnr_normal0 = mse2psnr(loss_normal0)
 
         gradients = tape.gradient(loss, grad_vars)
         optimizer.apply_gradients(zip(gradients, grad_vars))
@@ -1557,7 +1584,11 @@ def train():
                 tf.contrib.summary.scalar('psnr', psnr)
                 tf.contrib.summary.histogram('tran', trans)
                 if args.N_importance > 0:
-                    tf.contrib.summary.scalar('psnr0', psnr0)
+                    tf.contrib.summary.scalar('loss_img', loss_img)
+                    tf.contrib.summary.scalar('loss_albedo', loss_albedo)
+                    tf.contrib.summary.scalar('loss_normal', loss_normal)
+                    tf.contrib.summary.scalar('loss_albedo0', loss_albedo0)
+                    tf.contrib.summary.scalar('loss_normal0', loss_normal0)
 
             if i % args.i_img == 0:
 
@@ -1602,18 +1633,18 @@ def train():
                     tf.contrib.summary.image('norm', to8b(norm)[tf.newaxis])
                     tf.contrib.summary.image('sh_light', to8b(sh_light)[tf.newaxis])
                     tf.contrib.summary.image('depth', depth[tf.newaxis, ..., tf.newaxis])
+                    tf.contrib.summary.image('rgb_holdout', target[tf.newaxis])
                     # tf.contrib.summary.image(
                     #     'disp', disp[tf.newaxis, ..., tf.newaxis])
                     # tf.contrib.summary.image(
                     #     'acc', acc[tf.newaxis, ..., tf.newaxis])
 
                     tf.contrib.summary.scalar('psnr_holdout', psnr)
-                    tf.contrib.summary.image('rgb_holdout', target[tf.newaxis])
 
                 if args.N_importance > 0:
 
                     with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
-                        tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
+                        tf.contrib.summary.image('albedo0', to8b(extras['albedo0'])[tf.newaxis])
                         # tf.contrib.summary.image('rgb1', to8b(extras['rgb1'])[tf.newaxis])
                         # tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis, ..., tf.newaxis])
                         tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis, ..., tf.newaxis])
