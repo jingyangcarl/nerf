@@ -324,6 +324,9 @@ def render_rays(ray_batch,
         # which decomposes [nonuniformly distributed light power] for both diffuse and sh to a [uniform light power] * [visiblity map]
         # add to more output channel, vis_diffuse and vis_sh
 
+        # try this next 2021/01/23
+        # change near and far from 35 85 to 20 100 and change N_importance from 64 to 128
+
 
 
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
@@ -1229,8 +1232,8 @@ def train():
 
         # set near and far value, real distance
         # model 0 near 100 far 400
-        near = 35.
-        far = 85.
+        near = 20.
+        far = 100.
 
         # load light probe here for now
         # light_probe = imageio.imread(args.datadir+'/light/equirectangular.exr')
