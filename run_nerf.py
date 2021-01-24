@@ -311,23 +311,38 @@ def render_rays(ray_batch,
         nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
         light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
-        lt_diffuse = lt_pw_diffuse * albedo * light_diffuse
-        lt_sh = lt_pw_sh * albedo * light_sh
-        lt_spec = spec * light_diffuse
-        rgb = lt_vis_diffuse * lt_diffuse + lt_vis_sh * lt_sh
+        # 2021/01/21
+        # test if model_1_sh_* data works for my case
+        # Log: *_baseline
+        # Results: gt albedo and gt normal works
+        # Commit: 7f48425c50eb66e08408525a6896fc857e20badf
+            # rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
+            # loss = albedo_loss + normal_loss + img_loss0
 
-        # model_1_sh_*_baseline uses the follow equation
-        # rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
-
-        # try this next 2021/01/22
+        # 2021/01/22
         # let network pred visilibity map, which means to what extent can the sample be lighten up by the light point
         # which decomposes [nonuniformly distributed light power] for both diffuse and sh to a [uniform light power] * [visiblity map]
         # add to more output channel, vis_diffuse and vis_sh
+        # Log: *_visibility
+        # Results: it seems the result is better than rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
+        # Commit: 3f0a91cfa8c3fcc6b8ac498178b59ef58420de4d
+            # lt_diffuse = lt_pw_diffuse * albedo * light_diffuse
+            # lt_sh = lt_pw_sh * albedo * light_sh
+            # lt_spec = spec * light_diffuse
+            # rgb = lt_vis_diffuse * lt_diffuse + lt_vis_sh * lt_sh
+            # loss = 2*loss_img + loss_albedo + loss_normal + loss_albedo0 + loss_normal0
 
-        # try this next 2021/01/23
+        # 2021/01/23
         # change near and far from 35 85 to 20 100 and change N_importance from 64 to 128
+        # Log: *_near20_far100_Nimt128
+        # Results: 
 
-
+        # 2021/01/24
+        # update rendering equation
+        # lt_diffuse = lt_pw_diffuse * light_diffuse
+        # lt_sh = lt_pw_sh * light_sh
+        # lt_spec = spec * light_diffuse
+        # rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + spec * lt_diffuse
 
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
         # used to express the idea of the ray not having reflected up to this
