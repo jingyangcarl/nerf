@@ -15,7 +15,7 @@ white_bkgd = True
 
 N_rand = 1024
 chunk = 2048
-lrate = 2e-4
+lrate = 1e-4
 
 testskip = 1
 i_img = 1000

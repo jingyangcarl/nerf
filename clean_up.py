@@ -3,29 +3,29 @@ import sys
 import shutil
 
 dir_sh_list = [
-    # './logs/model_1_sh_21_test',
-    # './logs/model_1_sh_24_test',
-    # './logs/model_1_sh_32_test',
-    # './logs/model_1_sh_37_test',
-    './logs/model_1_sh_38_test',
-    # './logs/model_1_sh_45_test',
+    # './logs/model_2_sh_21_test',
+    # './logs/model_2_sh_24_test',
+    # './logs/model_2_sh_32_test',
+    './logs/model_2_sh_37_test',
+    './logs/model_2_sh_38_test',
+    # './logs/model_2_sh_45_test',
 ]
 
 summary_sh_list = [
-    # './logs/summaries/model_1_sh_21_test',
-    # './logs/summaries/model_1_sh_24_test',
-    # './logs/summaries/model_1_sh_32_test',
-    # './logs/summaries/model_1_sh_37_test',
-    './logs/summaries/model_1_sh_38_test',
-    # './logs/summaries/model_1_sh_45_test',
+    # './logs/summaries/model_2_sh_21_test',
+    # './logs/summaries/model_2_sh_24_test',
+    # './logs/summaries/model_2_sh_32_test',
+    './logs/summaries/model_2_sh_37_test',
+    './logs/summaries/model_2_sh_38_test',
+    # './logs/summaries/model_2_sh_45_test',
 ]
 
 # dir_sh_list = [
-#     './logs/model_1_partial_test',
+#     './logs/model_2_partial_test',
 # ]
 
 # summary_sh_list = [
-#     './logs/summaries/model_1_partial_test',
+#     './logs/summaries/model_2_partial_test',
 # ]
 
 # dir_sh_list = [

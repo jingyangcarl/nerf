@@ -335,14 +335,17 @@ def render_rays(ray_batch,
         # 2021/01/23
         # change near and far from 35 85 to 20 100 and change N_importance from 64 to 128
         # Log: *_near20_far100_Nimt128
-        # Results: 
+        # Results: compared with experiments on 2021/01/22, no improvement
 
         # 2021/01/24
-        # update rendering equation
-        # lt_diffuse = lt_pw_diffuse * light_diffuse
-        # lt_sh = lt_pw_sh * light_sh
-        # lt_spec = spec * light_diffuse
-        # rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + spec * lt_diffuse
+        # update rendering equation, and also change near far N_import back to 35 85 64, which will faster training
+        # Log: *_spec
+        # Commit: 
+        # Results: 
+        lt_diffuse = lt_pw_diffuse * light_diffuse
+        lt_sh = lt_pw_sh * light_sh
+        lt_spec = spec * light_diffuse
+        rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + lt_spec
 
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
         # used to express the idea of the ray not having reflected up to this
@@ -1247,8 +1250,8 @@ def train():
 
         # set near and far value, real distance
         # model 0 near 100 far 400
-        near = 20.
-        far = 100.
+        near = 35.
+        far = 85.
 
         # load light probe here for now
         # light_probe = imageio.imread(args.datadir+'/light/equirectangular.exr')
