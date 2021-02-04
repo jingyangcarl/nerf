@@ -239,6 +239,16 @@ def render_rays(ray_batch,
         # Predict density of each sample along each ray. Higher values imply
         # higher likelihood of being absorbed at this point.
         alpha = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
+
+        # 2021/01/26
+        # use raw_material net to predict albedo and normal, and try to predict a clean rgb
+        # Log: *_material_net
+        # Commit: 16aa9dee580e28fb67c3835435e206cc0d3f07a6
+        # Results: albedo and normal cannot be predict precisely by the material net
+
+        # 2021/02/03
+        # try to stop gradient
+        # Log: *_stop_grad
     
         norm = 2. * tf.math.sigmoid(raw_material[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
