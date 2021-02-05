@@ -11,22 +11,26 @@ dir_list = [
     'model_1_sh_38_test',
     'model_1_sh_45_test',
 ]
+name = 'newname'
 
 for d in dir_list:
     # get path
     path_log = os.path.join(basedir, d)
     path_summary = os.path.join(basedir, 'summaries', d)
 
-    # remove path_log
+    path_log_new = os.path.join(basedir, '{}_{}'.format(d, name))
+    path_summary_new = os.path.join(basedir, 'summaries', '{}_{}'.format(d, name))
+
+    # rename path_log
     if os.path.exists(path_log):
-        shutil.rmtree(path_log)
-        print(path_log, 'is removed')
+        shutil.move(path_log, path_log_new)
+        print(path_log, '->', path_log_new)
     else:
         print(path_log, 'is not existed')
 
-    # remote path_summary
+    # rename path_summary
     if os.path.exists(path_summary):
-        shutil.rmtree(path_summary)
-        print(path_summary, 'is removed')
+        shutil.move(path_summary, path_summary_new)
+        print(path_summary, '->', path_summary_new)
     else:
         print(path_summary, 'is not existed')
