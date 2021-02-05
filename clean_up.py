@@ -2,60 +2,27 @@ import os
 import sys
 import shutil
 
+basedir = '/glab2/Users/jyang/project/nerf/logs_test'
 dir_sh_list = [
-    # './logs/model_2_sh_21_test',
-    # './logs/model_2_sh_24_test',
-    # './logs/model_2_sh_32_test',
-    './logs/model_2_sh_37_test',
-    './logs/model_2_sh_38_test',
-    # './logs/model_2_sh_45_test',
+    'model_1_sh_21_test',
+    'model_1_sh_24_test',
+    'model_1_sh_32_test',
+    'model_1_sh_37_test',
+    'model_1_sh_38_test',
+    'model_1_sh_45_test',
 ]
-
-summary_sh_list = [
-    # './logs/summaries/model_2_sh_21_test',
-    # './logs/summaries/model_2_sh_24_test',
-    # './logs/summaries/model_2_sh_32_test',
-    './logs/summaries/model_2_sh_37_test',
-    './logs/summaries/model_2_sh_38_test',
-    # './logs/summaries/model_2_sh_45_test',
-]
-
-# dir_sh_list = [
-#     './logs/model_2_partial_test',
-# ]
-
-# summary_sh_list = [
-#     './logs/summaries/model_2_partial_test',
-# ]
-
-# dir_sh_list = [
-#     './logs/nerf_lego_all_test',
-#     './logs/nerf_lego_partial_test',
-#     './logs/nerf_hotdog_test',
-#     './logs/nerf_chair_test',
-#     './logs/nerf_materials_test',
-#     './logs/nerf_ficus_test',
-# ]
-
-# summary_sh_list = [
-#     './logs/summaries/nerf_lego_all_test',
-#     './logs/summaries/nerf_lego_partial_test',
-#     './logs/summaries/nerf_hotdog_test',
-#     './logs/summaries/nerf_chair_test',
-#     './logs/summaries/nerf_materials_test',
-#     './logs/summaries/nerf_ficus_test',
-# ]
 
 for d in dir_sh_list:
-    if os.path.exists(d):
-        shutil.rmtree(d)
-        print(d, 'is removed')
+    path_log = os.path.join(basedir, d)
+    path_summary = os.path.join(basedir, 'summaries', d)
+    if os.path.exists(path_log):
+        shutil.rmtree(path_log)
+        print(path_log, 'is removed')
     else:
-        print(d, 'is not existed')
+        print(path_log, 'is not existed')
 
-for d in summary_sh_list:
-    if os.path.exists(d):
-        shutil.rmtree(d)
-        print(d, 'is removed')
+    if os.path.exists(path_summary):
+        shutil.rmtree(path_summary)
+        print(path_summary, 'is removed')
     else:
-        print(d, 'is not existed')
+        print(path_summary, 'is not existed')
