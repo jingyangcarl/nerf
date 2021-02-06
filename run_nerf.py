@@ -239,16 +239,6 @@ def render_rays(ray_batch,
         # Predict density of each sample along each ray. Higher values imply
         # higher likelihood of being absorbed at this point.
         alpha = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
-
-        # 2021/01/26
-        # use raw_material net to predict albedo and normal, and try to predict a clean rgb
-        # Log: *_material_net
-        # Commit: 16aa9dee580e28fb67c3835435e206cc0d3f07a6
-        # Results: albedo and normal cannot be predict precisely by the material net
-
-        # 2021/02/03
-        # try to stop gradient
-        # Log: *_stop_grad
     
         norm = 2. * tf.math.sigmoid(raw_material[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
@@ -266,6 +256,14 @@ def render_rays(ray_batch,
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
         norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
         norm_x2, norm_y2, norm_z2 = norm_x*norm_x, norm_y*norm_y, norm_z*norm_z
+
+        # 2021/02/03
+        # try to stop gradient
+        # Log: *_stop_grad
+        # Commit: 
+        # Results:
+        # tf.stop_gradient(albedo)
+        # tf.stop_gradient(norm)
 
         # Extract sphereical harmoncis coefficients
         sh_basis = [
@@ -356,13 +354,20 @@ def render_rays(ray_batch,
         lt_diffuse = lt_pw_diffuse * light_diffuse
         lt_sh = lt_pw_sh * light_sh
         lt_spec = spec * light_diffuse
-        rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + lt_spec
+        # rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + lt_spec
+        rgb = tf.math.sigmoid(raw[..., :3])
 
         # 2021/01/24
         # output specular map as well as visbility map and leave the equation unchanged
         # Log: *_spec
         # Commit: 17bac7cd90defd27482631402dc62b4b1797704c
-        # Results: 
+        # Results: work not good
+
+        # 2021/01/26
+        # use raw_material net to predict albedo and normal, and try to predict a clean rgb
+        # Log: *_material_net
+        # Commit: 16aa9dee580e28fb67c3835435e206cc0d3f07a6
+        # Results: albedo and normal cannot be predict precisely by the material net
 
         # Compute weight for RGB of each sample along each ray.  A cumprod() is
         # used to express the idea of the ray not having reflected up to this

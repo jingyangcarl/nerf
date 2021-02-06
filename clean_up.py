@@ -2,7 +2,7 @@ import os
 import sys
 import shutil
 
-basedir = '/glab2/Users/jyang/project/nerf/logs_test'
+basedir = '/glab2/Users/jyang/project/nerf/logs_2'
 dir_list = [
     'model_1_sh_21_test',
     'model_1_sh_24_test',
