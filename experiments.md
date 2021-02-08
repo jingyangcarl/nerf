@@ -7,9 +7,9 @@ Commit: bab2436cede175d63543b0277add93b8c27eda0c
 Results: albedo looks not clear, also normal map looks not clear as well. RGB mpa looks correct. The reason could be the two network are currently using the same density value, which should be separate, using density from model_material to predict albedo as well as normal map and using density from model_fine to predict rgb
 
 ----------------------------------------------------------------------------
-Date: 2021/02/06
+Date: 2021/02/06 -> 2021/02/07 (due to server reboot)
 Experiments Index: 1
 Detail: Use density from model_material to predict albedo as well as normal map and using density from model_fine to predict rgb and see if the predicted albedo and normal looks better.
 Logs: logs_2/*_baseline_separate_density
-Commit: 
+Commit: 083c2d089d0c39040ccbf4fe0ea540cdb3feee09
 Results: 
