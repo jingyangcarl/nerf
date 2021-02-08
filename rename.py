@@ -10,15 +10,14 @@ dir_list = [
     'model_1_sh_37_test',
     'model_1_sh_38_test',
     'model_1_sh_45_test',
-
-    # 'model_2_sh_21_test',
-    # 'model_2_sh_24_test',
-    # 'model_2_sh_32_test',
-    # 'model_2_sh_37_test',
-    # 'model_2_sh_38_test',
-    # 'model_2_sh_45_test',
+    'model_2_sh_21_test',
+    'model_2_sh_24_test',
+    'model_2_sh_32_test',
+    'model_2_sh_37_test',
+    'model_2_sh_38_test',
+    'model_2_sh_45_test',
 ]
-name = 'material_net'
+name = 'baseline_combine_density'
 
 for d in dir_list:
     # get path
