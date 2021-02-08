@@ -226,10 +226,6 @@ def render_rays(ray_batch,
         # to convert to real world distance (accounts for non-unit directions).
         dists = dists * tf.linalg.norm(rays_d[..., None, :], axis=-1)
 
-        # Extract albedo of each sample position along each ray.
-        # albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
-        albedo = tf.math.sigmoid(raw_material[..., :3])  # [N_rays, N_samples, 3]
-
         # Add noise to model's predictions for density. Can be used to
         # regularize network during training (prevents floater artifacts).
         noise = 0.
@@ -238,8 +234,11 @@ def render_rays(ray_batch,
 
         # Predict density of each sample along each ray. Higher values imply
         # higher likelihood of being absorbed at this point.
-        alpha = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
+        alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
+        alpha_material = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
     
+        # Extract albedo of each sample position along each ray.
+        albedo = tf.math.sigmoid(raw_material[..., :3])  # [N_rays, N_samples, 3]
         norm = 2. * tf.math.sigmoid(raw_material[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
         lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
@@ -373,20 +372,20 @@ def render_rays(ray_batch,
         # used to express the idea of the ray not having reflected up to this
         # sample yet.
         # [N_rays, N_samples]
-        weights = alpha * \
-            tf.math.cumprod(1.-alpha + 1e-10, axis=-1, exclusive=True)
+        weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, axis=-1, exclusive=True)
+        weights_material = alpha_material * tf.math.cumprod(1.-alpha_material + 1e-10, axis=-1, exclusive=True)
 
         # Computed weighted color of each sample along each ray.
         rgb_map = tf.reduce_sum(
             weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
         albedo_map = tf.reduce_sum(
-            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+            weights_material[..., None] * albedo, axis=-2)  # [N_rays, 3]
         diffuse_map = tf.reduce_sum(
-            weights[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
+            weights_material[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
         norm_map = tf.reduce_sum(
-            weights[..., None] * norm, axis=-2)  # [N_rays, 3]
+            weights_material[..., None] * norm, axis=-2)  # [N_rays, 3]
         sh_map = tf.reduce_sum(
-            weights[..., None] * light_sh, axis=-2)  # [N_rays, 3]
+            weights_material[..., None] * light_sh, axis=-2)  # [N_rays, 3]
 
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
