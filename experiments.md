@@ -12,4 +12,12 @@ Experiments Index: 1
 Detail: Use density from model_material to predict albedo as well as normal map and using density from model_fine to predict rgb and see if the predicted albedo and normal looks better.
 Logs: logs_2/*_baseline_separate_density
 Commit: 083c2d089d0c39040ccbf4fe0ea540cdb3feee09
+Results: albedo and normal map looks clear, which means they cannot share the same set of densities on the ray. It's recommended to apply a voxel based ground truth from 3D geometry, which is based on the inference of Nerf rendering equation, the network is actually learning the color of first intersection of the voxel grid.
+
+----------------------------------------------------------------------------
+Date: 2021/02/09 (due to server reboot)
+Experiments Index: 1
+Detail: Hanyuan generated results with really high quality, which is applied with a mask on transparency channel. The implementation was on Pytorch here (https://github.com/CorneliusHsiao/nerf-relightable-pytorch). Check out commit 05849881b40a5828753501b3c964c87dcbccf332 in utils.py at Line 560. The results look quite sharp and this experiment is used to implement normal mask on Tensorflow.
+Logs: logs_2/*_alpha_mask
+Commit: 
 Results: 
