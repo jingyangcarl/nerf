@@ -64,7 +64,7 @@ def render_rays(ray_batch,
                 perturb=0.,
                 N_importance=0,
                 network_fine=None,
-                network_material=None,
+                # network_material=None,
                 white_bkgd=False,
                 raw_noise_std=0.,
                 ray_width=4.,
@@ -115,7 +115,7 @@ def render_rays(ray_batch,
         sample.
     """
 
-    def raw2outputs(raw, z_vals, rays_d):
+    def raw2outputs(raw, z_vals, rays_d, mask):
         """Transforms model's predictions to semantically meaningful values.
 
         Args:
@@ -194,7 +194,7 @@ def render_rays(ray_batch,
         # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
         return albedo_map, norm_map, weights
 
-    def raw2outputs_test(raw, raw_material, z_vals, rays_d, sh, light_probe):
+    def raw2outputs_test(raw, raw_material, z_vals, rays_d, sh, light_probe, mask):
         """Transforms model's predictions to semantically meaningful values.
 
         Args:
@@ -235,11 +235,11 @@ def render_rays(ray_batch,
         # Predict density of each sample along each ray. Higher values imply
         # higher likelihood of being absorbed at this point.
         alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
-        alpha_material = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
+        # alpha_material = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
     
         # Extract albedo of each sample position along each ray.
-        albedo = tf.math.sigmoid(raw_material[..., :3])  # [N_rays, N_samples, 3]
-        norm = 2. * tf.math.sigmoid(raw_material[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
+        albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+        norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
         lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
         lt_pw_sh = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples,]
@@ -353,8 +353,8 @@ def render_rays(ray_batch,
         lt_diffuse = lt_pw_diffuse * light_diffuse
         lt_sh = lt_pw_sh * light_sh
         lt_spec = spec * light_diffuse
-        # rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + lt_spec
-        rgb = tf.math.sigmoid(raw[..., :3])
+        # rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo
+        rgb = albedo
 
         # 2021/01/24
         # output specular map as well as visbility map and leave the equation unchanged
@@ -373,19 +373,19 @@ def render_rays(ray_batch,
         # sample yet.
         # [N_rays, N_samples]
         weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, axis=-1, exclusive=True)
-        weights_material = alpha_material * tf.math.cumprod(1.-alpha_material + 1e-10, axis=-1, exclusive=True)
+        # weights_material = alpha_material * tf.math.cumprod(1.-alpha_material + 1e-10, axis=-1, exclusive=True)
 
         # Computed weighted color of each sample along each ray.
         rgb_map = tf.reduce_sum(
-            weights[..., None] * rgb, axis=-2)  # [N_rays, 3]
+            weights[..., None] * rgb, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         albedo_map = tf.reduce_sum(
-            weights_material[..., None] * albedo, axis=-2)  # [N_rays, 3]
+            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
         diffuse_map = tf.reduce_sum(
-            weights_material[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
+            weights[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
         norm_map = tf.reduce_sum(
-            weights_material[..., None] * norm, axis=-2)  # [N_rays, 3]
+            weights[..., None] * norm, axis=-2)  # [N_rays, 3]
         sh_map = tf.reduce_sum(
-            weights_material[..., None] * light_sh, axis=-2)  # [N_rays, 3]
+            weights[..., None] * light_sh, axis=-2)  # [N_rays, 3]
 
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
@@ -401,11 +401,12 @@ def render_rays(ray_batch,
 
         # To composite onto a white background, use the accumulated alpha map.
         if white_bkgd:
-            rgb_map = rgb_map + (1.-acc_map[..., None])
-            albedo_map = albedo_map + (1.-acc_map[..., None])
-            diffuse_map = diffuse_map + (1.-acc_map[..., None])
-            norm_map = norm_map + (1.-acc_map[..., None])
-            sh_map = sh_map + (1.-acc_map[..., None])
+            # rgb_map = rgb_map + (1.-acc_map[..., None])
+            # albedo_map = albedo_map + (1.-acc_map[..., None])
+            # diffuse_map = diffuse_map + (1.-acc_map[..., None])
+            # norm_map = norm_map + (1.-acc_map[..., None])
+            # sh_map = sh_map + (1.-acc_map[..., None])
+            pass
 
         return rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, spec_map, diffuse_vis_map, weights
 
@@ -618,6 +619,8 @@ def render_rays(ray_batch,
     bounds = tf.reshape(ray_batch[..., 6:8], [-1, 1, 2])
     near, far = bounds[..., 0], bounds[..., 1]  # [-1,1]
 
+    mask = ray_batch[:, 8]
+
     # Decide where to sample along each ray. Under the logic, all rays will be sampled at
     # the same times.
     t_vals = tf.linspace(0., 1., N_samples)
@@ -682,7 +685,8 @@ def render_rays(ray_batch,
         #     raw, z_vals, rays_d)
         # rgb_map, albedo_map, diffuse_map, norm_map, sh_map, weights = raws2outputs(
         #     raws, z_vals, rays_d, sh, light_probe)
-    albedo_0, normal_0, weights = raw2outputs(raw, z_vals, rays_d)
+    rgb_0, _, weights = raw2outputs(raw, z_vals, rays_d, mask)
+    # albedo_0, normal_0, weights = raw2outputs(raw, z_vals, rays_d)
     # _, normal_0, weights = raw2outputs(raw_norm, z_vals, rays_d)
 
     if N_importance > 0:
@@ -718,7 +722,8 @@ def render_rays(ray_batch,
         # Make predictions with network_fine.
         run_occupancy = network_fn if network_fine is None else network_fine
         raw = network_query_fn(pts, viewdirs, run_occupancy)
-        raw_material = network_query_fn(pts, viewdirs, network_material)
+        raw_material = raw
+        # raw_material = network_query_fn(pts, viewdirs, network_material)
         # raws = {}
         # raws['raw'] = raw
         # raws['raw_posx'] = network_query_fn(pts_posx, viewdirs, run_occupancy)
@@ -739,7 +744,7 @@ def render_rays(ray_batch,
             # rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, weights = raws2outputs(
             #     raws, z_vals, rays_d, sh, light_probe)
             rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, spec_map, diffuse_vis_map, weights = raw2outputs_test(
-                raw, raw_material, z_vals, rays_d, sh, light_probe)
+                raw, raw_material, z_vals, rays_d, sh, light_probe, mask)
 
     # ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
     #        'disp_map': disp_map, 'acc_map': acc_map}
@@ -748,8 +753,9 @@ def render_rays(ray_batch,
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
-        ret['albedo0'] = albedo_0
-        ret['normal0'] = normal_0
+        ret['rgb0'] = rgb_0
+        # ret['albedo0'] = albedo_0
+        # ret['normal0'] = normal_0
         # ret['rgb1'] = rgb_1
         # ret['albedo0'] = albedo_0
         # ret['diffuse0'] = diffuse_0
@@ -785,6 +791,7 @@ def render(H, W, focal,
            chunk=1024*32, rays=None, c2w=None, ndc=True,
            sh=None,
            light_probe=None,
+           mask=None,
            near=0., far=1.,
            use_viewdirs=False, c2w_staticcam=None,
            **kwargs):
@@ -846,9 +853,10 @@ def render(H, W, focal,
     rays_d = tf.cast(tf.reshape(rays_d, [-1, 3]), dtype=tf.float32)
     near, far = near * \
         tf.ones_like(rays_d[..., :1]), far * tf.ones_like(rays_d[..., :1])
+    rays_m = tf.cast(tf.reshape(mask, [-1, 1]), dtype=tf.float32)
 
     # (ray origin, ray direction, min dist, max dist) for each ray
-    rays = tf.concat([rays_o, rays_d, near, far], axis=-1)
+    rays = tf.concat([rays_o, rays_d, near, far, rays_m], axis=-1)
     if use_viewdirs:
         # (ray origin, ray direction, min dist, max dist, normalized viewing direction)
         rays = tf.concat([rays, viewdirs], axis=-1)
@@ -865,7 +873,7 @@ def render(H, W, focal,
     return ret_list + [ret_dict]
 
 
-def render_path(render_poses, hwfs, shs, light_probes, chunk, render_kwargs, names=None, gt_imgs=None, savedir=None, render_factor=0):
+def render_path(render_poses, hwfs, shs, light_probes, masks, chunk, render_kwargs, names=None, gt_imgs=None, savedir=None, render_factor=0):
 
     # H, W, focal = hwf
 
@@ -899,10 +907,12 @@ def render_path(render_poses, hwfs, shs, light_probes, chunk, render_kwargs, nam
         if shs.ndim == 2:
             sh = shs
             light_probe = light_probes
+            mask = masks
         else:
             # sh = shs[i, :4, :3]
             sh = shs[i, :16, :3]
             light_probe = light_probes[i]
+            mask = masks[i]
 
         # prepare hwf
         if hwfs.ndim == 1:
@@ -918,7 +928,7 @@ def render_path(render_poses, hwfs, shs, light_probes, chunk, render_kwargs, nam
 
         # render
         rgb, albedo, diffuse, norm, sh_light, depth, spec, diffuse_vis, _ = render(
-            H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, light_probe=light_probe, **render_kwargs)
+            H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, light_probe=light_probe, mask=mask, **render_kwargs)
 
         #
         rgbs.append(rgb.numpy())
@@ -1000,7 +1010,8 @@ def create_nerf(args):
         D=args.netdepth, W=args.netwidth,
         input_ch=input_ch, output_ch=output_ch, skips=skips,
         input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
-    grad_vars_material = model.trainable_variables
+    # grad_vars_material = model.trainable_variables
+    grad_vars = model.trainable_variables
     models = {'model': model}
 
     model_fine = None
@@ -1010,15 +1021,15 @@ def create_nerf(args):
             D=args.netdepth_fine, W=args.netwidth_fine,
             input_ch=input_ch, output_ch=output_ch, skips=skips,
             input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
-        grad_vars = model_fine.trainable_variables
+        grad_vars += model_fine.trainable_variables
         models['model_fine'] = model_fine
 
-        model_material = init_nerf_model(
-            D=args.netdepth_fine, W=args.netwidth_fine,
-            input_ch=input_ch, output_ch=output_ch, skips=skips,
-            input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
-        grad_vars_material += model_material.trainable_variables
-        models['model_material'] = model_material
+        # model_material = init_nerf_model(
+        #     D=args.netdepth_fine, W=args.netwidth_fine,
+        #     input_ch=input_ch, output_ch=output_ch, skips=skips,
+        #     input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs, input_ch_sh=input_ch_sh)
+        # grad_vars_material += model_material.trainable_variables
+        # models['model_material'] = model_material
 
     def network_query_fn(inputs, viewdirs, network_fn): return run_network(
         inputs, viewdirs, network_fn,
@@ -1031,7 +1042,7 @@ def create_nerf(args):
         'perturb': args.perturb,
         'N_importance': args.N_importance,
         'network_fine': model_fine,
-        'network_material': model_material,
+        # 'network_material': model_material,
         'N_samples': args.N_samples,
         'network_fn': model,
         'use_viewdirs': args.use_viewdirs,
@@ -1078,7 +1089,8 @@ def create_nerf(args):
         #     print('Reloading material from', ft_weights_material)
         #     model_material.set_weights(np.load(ft_weights_material, allow_pickle=True))
 
-    return render_kwargs_train, render_kwargs_test, start, grad_vars, grad_vars_material, models
+    # return render_kwargs_train, render_kwargs_test, start, grad_vars, grad_vars_material, models
+    return render_kwargs_train, render_kwargs_test, start, grad_vars, models
 
 
 def config_parser():
@@ -1301,9 +1313,13 @@ def train():
 
         # set white_bkgd if alpha channel is available
         if args.white_bkgd:
+            masks = images[..., -1:]
             images = images[..., :3]*images[..., -1:] + (1.-images[..., -1:])
             albedos_gt = albedos_gt[..., :3]*albedos_gt[..., -1:] + (1.-albedos_gt[..., -1:])
             normals_gt = normals_gt[..., :3]*normals_gt[..., -1:] + (1.-normals_gt[..., -1:])
+            # images = images[..., :3]*images[..., -1:]
+            # albedos_gt = albedos_gt[..., :3]*albedos_gt[..., -1:]
+            # normals_gt = normals_gt[..., :3]*normals_gt[..., -1:]
         else:
             images = images[..., :3]
 
@@ -1353,7 +1369,9 @@ def train():
             file.write(open(args.config, 'r').read())
 
     # Create nerf model
-    render_kwargs_train, render_kwargs_test, start, grad_vars, grad_vars_material, models = create_nerf(
+    # render_kwargs_train, render_kwargs_test, start, grad_vars, grad_vars_material, models = create_nerf(
+    #     args)
+    render_kwargs_train, render_kwargs_test, start, grad_vars, models = create_nerf(
         args)
 
     bds_dict = {
@@ -1393,8 +1411,8 @@ def train():
     optimizer = tf.keras.optimizers.Adam(lrate)
     models['optimizer'] = optimizer
 
-    optimizer_material = tf.keras.optimizers.Adam(lrate)
-    models['optimizer_material'] = optimizer_material
+    # optimizer_material = tf.keras.optimizers.Adam(lrate)
+    # models['optimizer_material'] = optimizer_material
 
     global_step = tf.compat.v1.train.get_or_create_global_step()
     global_step.assign(start)
@@ -1468,6 +1486,7 @@ def train():
             target = images[img_i]
             target_albedo = albedos_gt[img_i]
             target_normal = normals_gt[img_i]
+            target_mask = masks[img_i]
             pose = poses[img_i, :3, :4]
             # sh = shs[img_i, :4, :3]
             sh = shs[img_i, :16, :3]
@@ -1497,46 +1516,51 @@ def train():
                 rays_d = tf.gather_nd(rays_d, select_inds)
                 batch_rays = tf.stack([rays_o, rays_d], 0)
                 target_s = tf.gather_nd(target, select_inds)
-                target_albedo = tf.gather_nd(target_albedo, select_inds)
-                target_normal = tf.gather_nd(target_normal, select_inds)
+                target_a = tf.gather_nd(target_albedo, select_inds)
+                target_n = tf.gather_nd(target_normal, select_inds)
+                target_m = tf.gather_nd(target_mask, select_inds)
 
         #####  Core optimization loop  #####
 
-        with tf.GradientTape(persistent=True) as tape:
+        # with tf.GradientTape(persistent=True) as tape:
+        with tf.GradientTape() as tape:
         # Make predictions for color, disparity, accumulated opacity.
 
             rgb, albedo, _, normal, _, _, _, _, extras = render(
-                H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh, light_probe=light_probe,
+                H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh, light_probe=light_probe, mask=target_m, 
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
             # Compute MSE loss between predicted and true RGB.
             loss_img = img2mse(rgb, target_s)
-            loss_albedo = img2mse(albedo, target_albedo)
-            loss_normal = img2mse(normal, target_normal)
+            loss_albedo = img2mse(albedo, target_a)
+            loss_normal = img2mse(normal, target_n)
             # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
             loss = loss_img
-            loss_material = loss_albedo + loss_normal
+            # loss = loss_img + loss_albedo + loss_normal
             psnr = mse2psnr(loss)
             # psnr_img = mse2psnr(loss_img)
             # psnr_albedo = mse2psnr(loss_albedo)
             # psnr_normal = mse2psnr(loss_normal)
 
             # Add MSE loss for coarse-grained model
+            if 'rgb0' in extras:
+                loss_rgb0 = img2mse(extras['rgb0'], target_s)
+                loss += loss_rgb0
             if 'albedo0' in extras:
-                loss_albedo0 = img2mse(extras['albedo0'], target_albedo)
-                loss_material += loss_albedo0
+                loss_albedo0 = img2mse(extras['albedo0'], target_a)
+                loss += loss_albedo0
                 # psnr_albedo0 = mse2psnr(loss_albedo0)
             if 'normal0' in extras:
-                loss_normal0 = img2mse(extras['normal0'], target_normal)
-                loss_material += loss_normal0
+                loss_normal0 = img2mse(extras['normal0'], target_n)
+                loss += loss_normal0
                 # psnr_normal0 = mse2psnr(loss_normal0)
 
         gradients = tape.gradient(loss, grad_vars)
         optimizer.apply_gradients(zip(gradients, grad_vars))
 
-        gradients_material = tape.gradient(loss_material, grad_vars_material)
-        optimizer_material.apply_gradients(zip(gradients_material, grad_vars_material))
+        # gradients_material = tape.gradient(loss_material, grad_vars_material)
+        # optimizer_material.apply_gradients(zip(gradients_material, grad_vars_material))
 
         dt = time.time()-time0
 
@@ -1588,7 +1612,7 @@ def train():
                 basedir, expname, 'testset_{:06d}'.format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
-            render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], args.chunk, render_kwargs_test, names=names[i_test],
+            render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks[i_test], args.chunk, render_kwargs_test, names=names[i_test],
                         gt_imgs=images[i_test], savedir=testsavedir)
             print('Saved test set')
 
@@ -1604,8 +1628,9 @@ def train():
                     tf.contrib.summary.scalar('loss_img', loss_img)
                     tf.contrib.summary.scalar('loss_albedo', loss_albedo)
                     tf.contrib.summary.scalar('loss_normal', loss_normal)
-                    tf.contrib.summary.scalar('loss_albedo0', loss_albedo0)
-                    tf.contrib.summary.scalar('loss_normal0', loss_normal0)
+                    tf.contrib.summary.scalar('loss_rgb0', loss_rgb0)
+                    # tf.contrib.summary.scalar('loss_albedo0', loss_albedo0)
+                    # tf.contrib.summary.scalar('loss_normal0', loss_normal0)
 
             if i % args.i_img == 0:
 
@@ -1615,12 +1640,13 @@ def train():
                 name = names[img_i]
                 pose = poses[img_i, :3, :4]
                 sh = shs[img_i, :16, :3]
+                mask = masks[img_i]
                 light_probe = light_probes[img_i]
                 H, W, focal = hwfs[img_i]
                 H, W = int(H), int(W)
                 
                 rgb, albedo, diffuse, norm, sh_light, depth, spec, diffuse_vis, extras = render(
-                    H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, light_probe=light_probe, **render_kwargs_test)
+                    H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, light_probe=light_probe, mask=mask, **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
@@ -1667,8 +1693,9 @@ def train():
                 if args.N_importance > 0:
 
                     with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
-                        tf.contrib.summary.image('albedo0', to8b(extras['albedo0'])[tf.newaxis])
-                        tf.contrib.summary.image('normal0', to8b(extras['normal0'])[tf.newaxis])
+                        tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
+                        # tf.contrib.summary.image('albedo0', to8b(extras['albedo0'])[tf.newaxis])
+                        # tf.contrib.summary.image('normal0', to8b(extras['normal0'])[tf.newaxis])
                         # tf.contrib.summary.image('rgb1', to8b(extras['rgb1'])[tf.newaxis])
                         # tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis, ..., tf.newaxis])
                         tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis, ..., tf.newaxis])
