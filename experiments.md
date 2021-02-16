@@ -10,14 +10,28 @@ Results: albedo looks not clear, also normal map looks not clear as well. RGB mp
 Date: 2021/02/06 -> 2021/02/07 (due to server reboot)
 Experiments Index: 1
 Detail: Use density from model_material to predict albedo as well as normal map and using density from model_fine to predict rgb and see if the predicted albedo and normal looks better.
-Logs: logs_2/*_baseline_separate_density
+Logs: ./logs/*_baseline_separate_density -> logs_2/*_baseline_separate_density
 Commit: 083c2d089d0c39040ccbf4fe0ea540cdb3feee09
 Results: albedo and normal map looks clear, which means they cannot share the same set of densities on the ray. It's recommended to apply a voxel based ground truth from 3D geometry, which is based on the inference of Nerf rendering equation, the network is actually learning the color of first intersection of the voxel grid.
 
 ----------------------------------------------------------------------------
-Date: 2021/02/09 (due to server reboot)
+Date: 2021/02/09
 Experiments Index: 1
-Detail: Hanyuan generated results with really high quality, which is applied with a mask on transparency channel. The implementation was on Pytorch here (https://github.com/CorneliusHsiao/nerf-relightable-pytorch). Check out commit 05849881b40a5828753501b3c964c87dcbccf332 in utils.py at Line 560. The results look quite sharp and this experiment is used to implement normal mask on Tensorflow.
-Logs: logs_2/*_alpha_mask
+Detail: Hanyuan generated results with really high quality, which is applied with a mask on transparency channel. The implementation was on Pytorch here (https://github.com/CorneliusHsiao/nerf-relightable-pytorch). Check out commit 05849881b40a5828753501b3c964c87dcbccf332 in utils.py at Line 560.
+Logs: /home/ICT2000/hxiao/now/logs/model_2_sh_21_test/version_57/tf
+Commit: 05849881b40a5828753501b3c964c87dcbccf332 @ nerf-relightable-pytorch
+
+----------------------------------------------------------------------------
+Date: 2021/02/10 -> 2021/02/15 (due to new year)
+Experiments Index: 1
+Detail: The results look quite sharp and this experiment is used to implement normal mask on Tensorflow.
+Logs: ./logs/*_alpha_mask
+Commit: 78a116bba8704945166e43dd46105a220e23d9d7
+Results: The results is indeed improved a lot on resolution and sharpness, however comparied with pytorch version from Hanyuan, the speed, memory, quality (displacement) seems not as good as the one from pytorch. We need to focus on the quality first, a 800*800 experiments need to be conducted. The implementation is confirmed, Pytorch version (with spherical harmonics input) has not only the alpha mask but also two more layer on the output.
+
+Date: 2021/02/16
+Experiments Index: 1
+Detail: need a higher resolution results for displacement.
+Logs: ./logs/*_alpha_mask_800
 Commit: 
 Results: 
