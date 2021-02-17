@@ -353,8 +353,8 @@ def render_rays(ray_batch,
         lt_diffuse = lt_pw_diffuse * light_diffuse
         lt_sh = lt_pw_sh * light_sh
         lt_spec = spec * light_diffuse
-        # rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo
-        rgb = albedo
+        rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo
+        # rgb = albedo
 
         # 2021/01/24
         # output specular map as well as visbility map and leave the equation unchanged
@@ -379,11 +379,11 @@ def render_rays(ray_batch,
         rgb_map = tf.reduce_sum(
             weights[..., None] * rgb, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         albedo_map = tf.reduce_sum(
-            weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
+            weights[..., None] * albedo, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         diffuse_map = tf.reduce_sum(
             weights[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
         norm_map = tf.reduce_sum(
-            weights[..., None] * norm, axis=-2)  # [N_rays, 3]
+            weights[..., None] * norm, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         sh_map = tf.reduce_sum(
             weights[..., None] * light_sh, axis=-2)  # [N_rays, 3]
 
@@ -1536,8 +1536,8 @@ def train():
             loss_normal = img2mse(normal, target_n)
             # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            loss = loss_img
-            # loss = loss_img + loss_albedo + loss_normal
+            # loss = loss_img
+            loss = loss_img + loss_albedo + loss_normal
             psnr = mse2psnr(loss)
             # psnr_img = mse2psnr(loss_img)
             # psnr_albedo = mse2psnr(loss_albedo)
