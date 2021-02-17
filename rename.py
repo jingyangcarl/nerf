@@ -2,7 +2,7 @@ import os
 import sys
 import shutil
 
-basedir = '/glab2/Users/jyang/project/nerf/logs_2'
+basedir = './logs'
 dir_list = [
     'model_1_sh_21_test',
     'model_1_sh_24_test',
@@ -17,7 +17,7 @@ dir_list = [
     'model_2_sh_38_test',
     'model_2_sh_45_test',
 ]
-name = 'baseline_combine_density'
+name = 'alpha_mask'
 
 for d in dir_list:
     # get path

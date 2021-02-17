@@ -2,14 +2,20 @@ import os
 import sys
 import shutil
 
-basedir = '/glab2/Users/jyang/project/nerf/logs_2'
+basedir = './logs'
 dir_list = [
-    'model_1_sh_21_test',
-    'model_1_sh_24_test',
+    # 'model_1_sh_21_test',
+    # 'model_1_sh_24_test',
     'model_1_sh_32_test',
-    'model_1_sh_37_test',
-    'model_1_sh_38_test',
-    'model_1_sh_45_test',
+    # 'model_1_sh_37_test',
+    # 'model_1_sh_38_test',
+    # 'model_1_sh_45_test',
+    # 'model_2_sh_21_test',
+    # 'model_2_sh_24_test',
+    # 'model_2_sh_32_test',
+    # 'model_2_sh_37_test',
+    # 'model_2_sh_38_test',
+    # 'model_2_sh_45_test',
 ]
 
 for d in dir_list:

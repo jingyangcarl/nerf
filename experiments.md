@@ -29,9 +29,18 @@ Logs: ./logs/*_alpha_mask
 Commit: 78a116bba8704945166e43dd46105a220e23d9d7
 Results: The results is indeed improved a lot on resolution and sharpness, however comparied with pytorch version from Hanyuan, the speed, memory, quality (displacement) seems not as good as the one from pytorch. We need to focus on the quality first, a 800*800 experiments need to be conducted. The implementation is confirmed, Pytorch version (with spherical harmonics input) has not only the alpha mask but also two more layer on the output.
 
+----------------------------------------------------------------------------
 Date: 2021/02/16
 Experiments Index: 1
-Detail: need a higher resolution results for displacement.
-Logs: ./logs/*_alpha_mask_800
+Detail: need a higher resolution results for details.
+Logs: vgl-gpu03:./logs/*_alpha_mask_800
 Commit: 
+Results: It's obviously that there's no such big difference on training time for 400*400 and 800*800 cost on time complexity and space complexity. The current results look sharper than previous tf experiments, but still not as good as Hanyuan's. Will continue running on 03 to see the if it will be sharper.
+
+----------------------------------------------------------------------------
+Date: 2021/02/16
+Experiments Index: 2
+Detail: Since using alpha mask will help the network focus on face RGB prediction, this experiment is used to add normal loss as well as albedo loss.
+Logs: vgl-gpu05:./logs/*_albedo_normal_loss
+Commit:
 Results: 

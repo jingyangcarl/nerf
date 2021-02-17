@@ -1,9 +1,9 @@
 expname = model_1_sh_21_test
-basedir = /glab2/Users/jyang/project/nerf/logs_2
+basedir = ./logs
 datadir = /glab2/Users/jyang/data/nerf_synthesic/model_1_sh_21
 dataset_type = lightstage
 
-half_res = True
+half_res = False
 no_batching = True
 
 N_samples = 64
