@@ -41,6 +41,14 @@ Results: It's obviously that there's no such big difference on training time for
 Date: 2021/02/16
 Experiments Index: 2
 Detail: Since using alpha mask will help the network focus on face RGB prediction, this experiment is used to add normal loss as well as albedo loss.
-Logs: vgl-gpu05:./logs/*_albedo_normal_loss
+Logs: vgl-gpu04:./logs/*_albedo_normal_loss
 Commit:
+Results: 
+
+----------------------------------------------------------------------------
+Date: 2021/02/17
+Experiments Index: 1
+Detail: Use albedo and normal ground truth like alpha mask directly to the network output. For each ray, duplicate value from 2D to 3D.
+Logs: ./logs/*_albedo_normal_gt
+Commit: 
 Results: 
