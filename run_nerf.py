@@ -194,7 +194,7 @@ def render_rays(ray_batch,
         # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
         return albedo_map, norm_map, weights
 
-    def raw2outputs_test(raw, raw_material, z_vals, rays_d, sh, light_probe, mask):
+    def raw2outputs_test(raw, raw_material, z_vals, rays_d, sh, light_probe, mask, albedo_gt, normal_gt):
         """Transforms model's predictions to semantically meaningful values.
 
         Args:
@@ -238,8 +238,11 @@ def render_rays(ray_batch,
         # alpha_material = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
     
         # Extract albedo of each sample position along each ray.
-        albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
-        norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
+        # albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+        # norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
+        albedo = tf.broadcast_to(albedo_gt[:,None,:], alpha.shape.as_list() + [3])
+        norm = tf.broadcast_to(normal_gt[:,None,:], alpha.shape.as_list() + [3])
+
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
         lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
         lt_pw_sh = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples,]
@@ -354,7 +357,7 @@ def render_rays(ray_batch,
         lt_sh = lt_pw_sh * light_sh
         lt_spec = spec * light_diffuse
         rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo
-        # rgb = albedo
+        # rgb = tf.math.sigmoid(raw[..., :3])
 
         # 2021/01/24
         # output specular map as well as visbility map and leave the equation unchanged
@@ -620,6 +623,8 @@ def render_rays(ray_batch,
     near, far = bounds[..., 0], bounds[..., 1]  # [-1,1]
 
     mask = ray_batch[:, 8]
+    albedo_gt = ray_batch[:, 9:12]
+    normal_gt = ray_batch[:, 12:15]
 
     # Decide where to sample along each ray. Under the logic, all rays will be sampled at
     # the same times.
@@ -744,7 +749,7 @@ def render_rays(ray_batch,
             # rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, weights = raws2outputs(
             #     raws, z_vals, rays_d, sh, light_probe)
             rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, spec_map, diffuse_vis_map, weights = raw2outputs_test(
-                raw, raw_material, z_vals, rays_d, sh, light_probe, mask)
+                raw, raw_material, z_vals, rays_d, sh, light_probe, mask, albedo_gt, normal_gt)
 
     # ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
     #        'disp_map': disp_map, 'acc_map': acc_map}
@@ -792,6 +797,8 @@ def render(H, W, focal,
            sh=None,
            light_probe=None,
            mask=None,
+           albedo_gt=None,
+           normal_gt=None,
            near=0., far=1.,
            use_viewdirs=False, c2w_staticcam=None,
            **kwargs):
@@ -854,9 +861,11 @@ def render(H, W, focal,
     near, far = near * \
         tf.ones_like(rays_d[..., :1]), far * tf.ones_like(rays_d[..., :1])
     rays_m = tf.cast(tf.reshape(mask, [-1, 1]), dtype=tf.float32)
+    rays_a = tf.cast(tf.reshape(albedo_gt, [-1, 3]), dtype=tf.float32)
+    rays_n = tf.cast(tf.reshape(normal_gt, [-1, 3]), dtype=tf.float32)
 
     # (ray origin, ray direction, min dist, max dist) for each ray
-    rays = tf.concat([rays_o, rays_d, near, far, rays_m], axis=-1)
+    rays = tf.concat([rays_o, rays_d, near, far, rays_m, rays_a, rays_n], axis=-1)
     if use_viewdirs:
         # (ray origin, ray direction, min dist, max dist, normalized viewing direction)
         rays = tf.concat([rays, viewdirs], axis=-1)
@@ -873,7 +882,7 @@ def render(H, W, focal,
     return ret_list + [ret_dict]
 
 
-def render_path(render_poses, hwfs, shs, light_probes, masks, chunk, render_kwargs, names=None, gt_imgs=None, savedir=None, render_factor=0):
+def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normals_gt, chunk, render_kwargs, names=None, gt_imgs=None, savedir=None, render_factor=0):
 
     # H, W, focal = hwf
 
@@ -908,11 +917,15 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, chunk, render_kwar
             sh = shs
             light_probe = light_probes
             mask = masks
+            albedo_gt = albedos_gt
+            normal_gt = normals_gt
         else:
             # sh = shs[i, :4, :3]
             sh = shs[i, :16, :3]
             light_probe = light_probes[i]
             mask = masks[i]
+            albedo_gt = albedos_gt[i]
+            normal_gt = normals_gt[i]
 
         # prepare hwf
         if hwfs.ndim == 1:
@@ -928,7 +941,7 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, chunk, render_kwar
 
         # render
         rgb, albedo, diffuse, norm, sh_light, depth, spec, diffuse_vis, _ = render(
-            H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, light_probe=light_probe, mask=mask, **render_kwargs)
+            H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, light_probe=light_probe, mask=mask, albedo_gt=albedo_gt, normal_gt=normal_gt, **render_kwargs)
 
         #
         rgbs.append(rgb.numpy())
@@ -1527,7 +1540,7 @@ def train():
         # Make predictions for color, disparity, accumulated opacity.
 
             rgb, albedo, _, normal, _, _, _, _, extras = render(
-                H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh, light_probe=light_probe, mask=target_m, 
+                H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh, light_probe=light_probe, mask=target_m, albedo_gt=target_a, normal_gt=target_n,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
             # Compute MSE loss between predicted and true RGB.
@@ -1536,8 +1549,8 @@ def train():
             loss_normal = img2mse(normal, target_n)
             # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            # loss = loss_img
-            loss = loss_img + loss_albedo + loss_normal
+            loss = loss_img
+            # loss = loss_img + loss_albedo + loss_normal
             psnr = mse2psnr(loss)
             # psnr_img = mse2psnr(loss_img)
             # psnr_albedo = mse2psnr(loss_albedo)
@@ -1612,7 +1625,7 @@ def train():
                 basedir, expname, 'testset_{:06d}'.format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
-            render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks[i_test], args.chunk, render_kwargs_test, names=names[i_test],
+            render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks[i_test], albedos_gt[i_test], normals_gt[i_test], args.chunk, render_kwargs_test, names=names[i_test],
                         gt_imgs=images[i_test], savedir=testsavedir)
             print('Saved test set')
 
@@ -1641,12 +1654,14 @@ def train():
                 pose = poses[img_i, :3, :4]
                 sh = shs[img_i, :16, :3]
                 mask = masks[img_i]
+                albedo_gt = albedos_gt[img_i]
+                normal_gt = normals_gt[img_i]
                 light_probe = light_probes[img_i]
                 H, W, focal = hwfs[img_i]
                 H, W = int(H), int(W)
                 
                 rgb, albedo, diffuse, norm, sh_light, depth, spec, diffuse_vis, extras = render(
-                    H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, light_probe=light_probe, mask=mask, **render_kwargs_test)
+                    H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, light_probe=light_probe, mask=mask, albedo_gt=albedo_gt, normal_gt=normal_gt, **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
 
