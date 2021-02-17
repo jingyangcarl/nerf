@@ -35,20 +35,20 @@ Experiments Index: 1
 Detail: need a higher resolution results for details.
 Logs: vgl-gpu03:./logs/*_alpha_mask_800
 Commit: 
-Results: It's obviously that there's no such big difference on training time for 400*400 and 800*800 cost on time complexity and space complexity. The current results look sharper than previous tf experiments, but still not as good as Hanyuan's. Will continue running on 03 to see the if it will be sharper.
+Results: It's obviously that there's no such big difference on training time for 400*400 and 800*800 cost on time complexity and space complexity. The current results look sharper than previous tf experiments, but still not as good as Hanyuan's.
 
 ----------------------------------------------------------------------------
 Date: 2021/02/16
 Experiments Index: 2
 Detail: Since using alpha mask will help the network focus on face RGB prediction, this experiment is used to add normal loss as well as albedo loss.
 Logs: vgl-gpu04:./logs/*_albedo_normal_loss
-Commit:
-Results: 
+Commit: 1b96aada8fd0bbe095000dee404690ca1ec6c213
+Results: Also, using mask improves the final results including albedo, normal, as well as rgb way better then experiments without mask, but still not sharp. Need to use ground truth directly.
 
 ----------------------------------------------------------------------------
 Date: 2021/02/17
 Experiments Index: 1
 Detail: Use albedo and normal ground truth like alpha mask directly to the network output. For each ray, duplicate value from 2D to 3D.
-Logs: ./logs/*_albedo_normal_gt
-Commit: 
+Logs: vgl-gpu03:./logs/*_albedo_normal_gt
+Commit: 1d1cb6481d30e282696efbcd377a29659c34e24d
 Results: 
