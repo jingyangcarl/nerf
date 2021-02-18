@@ -59,4 +59,12 @@ Experiments Index: 2
 Detail: Use albedo ground truth directly, where details can be preserved, and let metwork predict normal with surpervision, so that the density can be preserved on each ray, which will not cause the midprediction on weights in experiment 2021/02/17-1.
 Logs: vgl-gpu04:./logs/*_albedo_gt_normal_loss
 Commit: ccb08170132a102dcdb9948f24e2a203482616db
+Results: Solved the problem in 2021/02/17-1 of weights midprediction. and also the generated final rgb results can preserve details from albedo. Moreover, even though details on normal map is smoothed, it's still the best results ever. It's just the outputed diffuse light map is not enlarged by the predicted diffuse power, which should be corrected in the next experiment. If we take a closer look at supervised normal map, the loss is continuing degrade and resuting to a more detailed normal map then ever.
+
+----------------------------------------------------------------------------
+Date: 2021/02/18
+Experiments Index: 1
+Detail: Output diffuse light map, diffuse light map litted, spherical harmonics map, spherical harmoncis map litted. This is used to check if the diffuse light and spherical harmonics lighting looks correct, since previous outputed diffuse light map times 5.0, which is an arbitrary value.
+Logs: vgl-gpu03:./logs/*_lit_diffuse_sh
+Commit: 7cd3ac1ca3392caff23cb6ff0b344079fccb68c8
 Results: 
