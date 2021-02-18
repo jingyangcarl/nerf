@@ -238,10 +238,11 @@ def render_rays(ray_batch,
         # alpha_material = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
     
         # Extract albedo of each sample position along each ray.
-        # albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
-        # norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
         albedo = tf.broadcast_to(albedo_gt[:,None,:], alpha.shape.as_list() + [3])
-        norm = tf.broadcast_to(normal_gt[:,None,:], alpha.shape.as_list() + [3])
+        # norm = tf.broadcast_to(normal_gt[:,None,:], alpha.shape.as_list() + [3])
+
+        # albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+        norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
 
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
         lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
@@ -356,7 +357,7 @@ def render_rays(ray_batch,
         lt_diffuse = lt_pw_diffuse * light_diffuse
         lt_sh = lt_pw_sh * light_sh
         lt_spec = spec * light_diffuse
-        rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo
+        rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + lt_spec
         # rgb = tf.math.sigmoid(raw[..., :3])
 
         # 2021/01/24
@@ -384,16 +385,16 @@ def render_rays(ray_batch,
         albedo_map = tf.reduce_sum(
             weights[..., None] * albedo, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         diffuse_map = tf.reduce_sum(
-            weights[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
+            weights[..., None] * light_diffuse, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         norm_map = tf.reduce_sum(
             weights[..., None] * norm, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         sh_map = tf.reduce_sum(
-            weights[..., None] * light_sh, axis=-2)  # [N_rays, 3]
+            weights[..., None] * light_sh, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
 
         # Estimated depth map is expected distance.
-        depth_map = tf.reduce_sum(weights * z_vals, axis=-1)
-        spec_map = tf.reduce_sum(weights * np.squeeze(spec), axis=-1)
-        diffuse_vis_map = tf.reduce_sum(weights * np.squeeze(lt_vis_diffuse), axis=-1)
+        depth_map = tf.reduce_sum(weights * z_vals, axis=-1) * mask + (1.-mask)
+        spec_map = tf.reduce_sum(weights * np.squeeze(spec), axis=-1) * mask + (1.-mask)
+        diffuse_vis_map = tf.reduce_sum(weights * np.squeeze(lt_vis_diffuse), axis=-1) * mask + (1.-mask)
 
         # Disparity map is inverse depth.
         # disp_map = 1./tf.maximum(1e-10, depth_map /
@@ -1549,7 +1550,7 @@ def train():
             loss_normal = img2mse(normal, target_n)
             # sh_loss = img2mse(sh_coef, sh_parm)
             trans = extras['raw'][..., -1]
-            loss = loss_img
+            loss = loss_img + loss_normal
             # loss = loss_img + loss_albedo + loss_normal
             psnr = mse2psnr(loss)
             # psnr_img = mse2psnr(loss_img)
