@@ -245,14 +245,14 @@ def render_rays(ray_batch,
         norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
 
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
-        lt_pw_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
-        lt_pw_sh = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples,]
+        lt_diffuse_pw = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
+        lt_sh_pw = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples,]
         lt_vis_diffuse = tf.nn.relu(raw[..., 10])  # [N_rays, N_samples,]
         lt_vis_sh = tf.nn.relu(raw[..., 11])  # [N_rays, N_samples,]
 
         spec = spec[..., None]
-        lt_pw_diffuse = tf.reduce_mean(lt_pw_diffuse)
-        lt_pw_sh = tf.reduce_mean(lt_pw_sh)
+        lt_diffuse_pw = tf.reduce_mean(lt_diffuse_pw)
+        lt_sh_pw = tf.reduce_mean(lt_sh_pw)
         lt_vis_diffuse = lt_vis_diffuse[..., None]
         lt_vis_sh = lt_vis_sh[..., None]
 
@@ -293,7 +293,7 @@ def render_rays(ray_batch,
         ]
         sh_basis = tf.stack(sh_basis, axis=-1) # [N_rays, N_samples, 16]
         sh = tf.broadcast_to(sh, sh_basis.shape.as_list()[:2] + list(sh.shape)) # [N_rays, N_samples, 16, 3]
-        light_sh = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
+        lt_sh = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
 
         # for direct light
         # down_step = 100
@@ -321,14 +321,14 @@ def render_rays(ray_batch,
         l_weight = np.sin(theta) # [h,]
         l_color = np.reshape(light_probe * l_weight[:, None, None], (-1,3)).astype(np.float32) # [h*w,3]
         nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
-        light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
+        lt_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
         # 2021/01/21
         # test if model_1_sh_* data works for my case
         # Log: *_baseline
         # Results: gt albedo and gt normal works
         # Commit: 7f48425c50eb66e08408525a6896fc857e20badf
-            # rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
+            # rgb = lt_diffuse_pw * albedo * lt_diffuse + lt_sh_pw * lt_sh
             # loss = albedo_loss + normal_loss + img_loss0
 
         # 2021/01/22
@@ -336,12 +336,12 @@ def render_rays(ray_batch,
         # which decomposes [nonuniformly distributed light power] for both diffuse and sh to a [uniform light power] * [visiblity map]
         # add to more output channel, vis_diffuse and vis_sh
         # Log: *_visibility
-        # Results: it seems the result is better than rgb = lt_pw_diffuse * albedo * light_diffuse + lt_pw_sh * light_sh
+        # Results: it seems the result is better than rgb = lt_diffuse_pw * albedo * lt_diffuse + lt_sh_pw * lt_sh
         # Commit: 3f0a91cfa8c3fcc6b8ac498178b59ef58420de4d
-            # lt_diffuse = lt_pw_diffuse * albedo * light_diffuse
-            # lt_sh = lt_pw_sh * albedo * light_sh
-            # lt_spec = spec * light_diffuse
-            # rgb = lt_vis_diffuse * lt_diffuse + lt_vis_sh * lt_sh
+            # lt_diffuse_lit = lt_diffuse_pw * albedo * lt_diffuse
+            # lt_sh_lit = lt_sh_pw * albedo * lt_sh
+            # lt_spec = spec * lt_diffuse
+            # rgb = lt_vis_diffuse * lt_diffuse_lit + lt_vis_sh * lt_sh_lit
             # loss = 2*loss_img + loss_albedo + loss_normal + loss_albedo0 + loss_normal0
 
         # 2021/01/23
@@ -354,10 +354,10 @@ def render_rays(ray_batch,
         # Log: *_spec
         # Commit: 8dff0baa64953442eda1188222f88689cdfce25e
         # Results: the results is better than previous experiments expecially on the forehead
-        lt_diffuse = lt_pw_diffuse * light_diffuse
-        lt_sh = lt_pw_sh * light_sh
-        lt_spec = spec * light_diffuse
-        rgb = (lt_vis_diffuse * lt_diffuse + lt_sh) * albedo + lt_spec
+        lt_diffuse_lit = lt_diffuse_pw * lt_diffuse
+        lt_sh_lit = lt_sh_pw * lt_sh
+        lt_spec = spec * lt_diffuse
+        rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo + lt_spec
         # rgb = tf.math.sigmoid(raw[..., :3])
 
         # 2021/01/24
@@ -384,12 +384,16 @@ def render_rays(ray_batch,
             weights[..., None] * rgb, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         albedo_map = tf.reduce_sum(
             weights[..., None] * albedo, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
-        diffuse_map = tf.reduce_sum(
-            weights[..., None] * light_diffuse, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         norm_map = tf.reduce_sum(
             weights[..., None] * norm, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+        diffuse_map = tf.reduce_sum(
+            weights[..., None] * lt_diffuse, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         sh_map = tf.reduce_sum(
-            weights[..., None] * light_sh, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+            weights[..., None] * lt_sh, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+        diffuse_lit_map = tf.reduce_sum(
+            weights[..., None] * lt_diffuse_lit, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+        sh_lit_map = tf.reduce_sum(
+            weights[..., None] * lt_sh_lit, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
 
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1) * mask + (1.-mask)
@@ -412,7 +416,7 @@ def render_rays(ray_batch,
             # sh_map = sh_map + (1.-acc_map[..., None])
             pass
 
-        return rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, spec_map, diffuse_vis_map, weights
+        return rgb_map, albedo_map, norm_map, diffuse_map, sh_map, diffuse_lit_map, sh_lit_map, depth_map, spec_map, diffuse_vis_map, weights
 
     # def raws2outputs(raws, z_vals, rays_d, sh, light_probe):
     #     """Transforms model's predictions to semantically meaningful values.
@@ -582,10 +586,10 @@ def render_rays(ray_batch,
     #     l_weight = np.sin(theta) # [h,]
     #     l_color = np.reshape(light_probe * l_weight[:, None, None], (-1,3)).astype(np.float32) # [h*w,3]
     #     nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
-    #     light_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
+    #     lt_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
-    #     # rgb = albedo * light_diffuse + sh_light
-    #     albedo = (rgb - sh_power * sh_light) / (l_power * light_diffuse + 1e-5)
+    #     # rgb = albedo * lt_diffuse + sh_light
+    #     albedo = (rgb - sh_power * sh_light) / (l_power * lt_diffuse + 1e-5)
 
     #     # Computed weighted color of each sample along each ray.
     #     rgb_map = tf.reduce_sum(
@@ -593,7 +597,7 @@ def render_rays(ray_batch,
     #     albedo_map = tf.reduce_sum(
     #         weights[..., None] * albedo, axis=-2)  # [N_rays, 3]
     #     diffuse_map = tf.reduce_sum(
-    #         weights[..., None] * light_diffuse, axis=-2) * 5.0  # [N_rays, 3]
+    #         weights[..., None] * lt_diffuse, axis=-2) * 5.0  # [N_rays, 3]
     #     norm_map = tf.reduce_sum(
     #         weights[..., None] * norm, axis=-2)  # [N_rays, 3]
     #     sh_map = tf.reduce_sum(
@@ -749,13 +753,13 @@ def render_rays(ray_batch,
             # rgb_1, _ = raw2outputs(raw, z_vals, rays_d)
             # rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, weights = raws2outputs(
             #     raws, z_vals, rays_d, sh, light_probe)
-            rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, spec_map, diffuse_vis_map, weights = raw2outputs_test(
+            rgb_map, albedo_map, norm_map, diffuse_map, sh_map, diffuse_lit_map, sh_lit_map, depth_map, spec_map, diffuse_vis_map, weights = raw2outputs_test(
                 raw, raw_material, z_vals, rays_d, sh, light_probe, mask, albedo_gt, normal_gt)
 
     # ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'sh_map': sh_map, 'spec_map': spec_map, 'sh_coef_out': sh_coef_out,
     #        'disp_map': disp_map, 'acc_map': acc_map}
-    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'diffuse_map': diffuse_map,
-           'norm_map': norm_map, 'sh_map': sh_map, 'depth_map': depth_map, 'spec_map': spec_map, 'diffuse_vis_map': diffuse_vis_map}
+    ret = {'rgb_map': rgb_map, 'albedo_map': albedo_map, 'norm_map': norm_map, 'diffuse_map': diffuse_map,
+           'sh_map': sh_map, 'diffuse_lit_map': diffuse_lit_map, 'sh_lit_map': sh_lit_map, 'depth_map': depth_map, 'spec_map': spec_map, 'diffuse_vis_map': diffuse_vis_map}
     if retraw:
         ret['raw'] = raw
     if N_importance > 0:
@@ -877,7 +881,7 @@ def render(H, W, focal,
         k_sh = list(shp[:-1]) + list(all_ret[k].shape[1:])
         all_ret[k] = tf.reshape(all_ret[k], k_sh)
 
-    k_extract = ['rgb_map', 'albedo_map', 'diffuse_map', 'norm_map', 'sh_map', 'depth_map', 'spec_map', 'diffuse_vis_map']
+    k_extract = ['rgb_map', 'albedo_map', 'norm_map', 'diffuse_map', 'sh_map', 'diffuse_lit_map', 'sh_lit_map', 'depth_map', 'spec_map', 'diffuse_vis_map']
     ret_list = [all_ret[k] for k in k_extract]
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
@@ -900,9 +904,11 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normal
 
     rgbs = []
     albedos = []
-    diffuses = []
     norms = []
+    diffuses = []
     sh_lights = []
+    diffuse_lits = []
+    sh_lits = []
     depths = []
     specs = []
     diffuse_vises = []
@@ -941,15 +947,17 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normal
             focal = focal/render_factor
 
         # render
-        rgb, albedo, diffuse, norm, sh_light, depth, spec, diffuse_vis, _ = render(
+        rgb, albedo, norm, diffuse, sh_light, diffuse_lit, sh_lit, depth, spec, diffuse_vis, _ = render(
             H, W, focal, chunk=chunk, c2w=c2w[:3, :4], sh=sh, light_probe=light_probe, mask=mask, albedo_gt=albedo_gt, normal_gt=normal_gt, **render_kwargs)
 
         #
         rgbs.append(rgb.numpy())
         albedos.append(albedo.numpy())
-        diffuses.append(diffuse.numpy())
         norms.append(norm.numpy())
+        diffuses.append(diffuse.numpy())
         sh_lights.append(sh_light.numpy())
+        diffuse_lits.append(diffuse_lit.numpy())
+        sh_lits.append(sh_lit.numpy())
         depths.append(depth.numpy())
         specs.append(spec.numpy())
         diffuse_vises.append(diffuse_vis.numpy())
@@ -963,9 +971,11 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normal
         if savedir is not None:
             rgb8 = to8b(rgbs[-1])
             albedo8 = to8b(albedos[-1])
-            diffuse8= to8b(diffuses[-1])
             norm8 = to8b(norms[-1])
+            diffuse8= to8b(diffuses[-1])
             sh_light8 = to8b(sh_lights[-1])
+            diffuse_lit8 = to8b(diffuse_lits[-1])
+            sh_lit8 = to8b(sh_lits[-1])
             depth8 = to8b(depths[-1])
             spec8 = to8b(specs[-1])
             diffuse_vis8 = to8b(diffuse_vises[-1])
@@ -975,11 +985,15 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normal
             imageio.imwrite(os.path.join(
                 savedir, '{:03d}_{}_albedo.png'.format(i, names[i])), albedo8)
             imageio.imwrite(os.path.join(
-                savedir, '{:03d}_{}_diffuse.png'.format(i, names[i])), diffuse8)
-            imageio.imwrite(os.path.join(
                 savedir, '{:03d}_{}_norm.png'.format(i, names[i])), norm8)
             imageio.imwrite(os.path.join(
+                savedir, '{:03d}_{}_diffuse.png'.format(i, names[i])), diffuse8)
+            imageio.imwrite(os.path.join(
                 savedir, '{:03d}_{}_sh_light.png'.format(i, names[i])), sh_light8)
+            imageio.imwrite(os.path.join(
+                savedir, '{:03d}_{}_diffuse_lit.png'.format(i, names[i])), diffuse_lit8)
+            imageio.imwrite(os.path.join(
+                savedir, '{:03d}_{}_sh_lit.png'.format(i, names[i])), sh_lit8)
             imageio.imwrite(os.path.join(
                 savedir, '{:03d}_{}_depth.png'.format(i, names[i])), depth8)
             imageio.imwrite(os.path.join(
@@ -996,7 +1010,7 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normal
     specs = np.stack(specs, 0)
     diffuse_vises = np.stack(diffuse_vises, 0)
 
-    return rgbs, albedos, diffuses, norms, sh_lights, depths, specs, diffuse_vises
+    return rgbs, albedos, norms, diffuses, sh_lights, diffuse_lits, sh_lits, depths, specs, diffuse_vises
 
 
 def create_nerf(args):
@@ -1540,7 +1554,7 @@ def train():
         with tf.GradientTape() as tape:
         # Make predictions for color, disparity, accumulated opacity.
 
-            rgb, albedo, _, normal, _, _, _, _, extras = render(
+            rgb, albedo, normal, _, _, _, _, _, _, _, extras = render(
                 H, W, focal, chunk=args.chunk, rays=batch_rays, sh=sh, light_probe=light_probe, mask=target_m, albedo_gt=target_a, normal_gt=target_n,
                 verbose=i < 10, retraw=True, **render_kwargs_train)
 
@@ -1661,7 +1675,7 @@ def train():
                 H, W, focal = hwfs[img_i]
                 H, W = int(H), int(W)
                 
-                rgb, albedo, diffuse, norm, sh_light, depth, spec, diffuse_vis, extras = render(
+                rgb, albedo, norm, diffuse, sh_light, diffuse_lit, sh_lit, depth, spec, diffuse_vis, extras = render(
                     H, W, focal, chunk=args.chunk, c2w=pose, sh=sh, light_probe=light_probe, mask=mask, albedo_gt=albedo_gt, normal_gt=normal_gt, **render_kwargs_test)
 
                 psnr = mse2psnr(img2mse(rgb, target))
@@ -1676,11 +1690,15 @@ def train():
                     imageio.imwrite(os.path.join(
                         testimgdir, '{:06d}_{}_albedo.png'.format(i, name)), to8b(albedo))
                     imageio.imwrite(os.path.join(
-                        testimgdir, '{:06d}_{}_diffuse.png'.format(i, name)), to8b(diffuse))
-                    imageio.imwrite(os.path.join(
                         testimgdir, '{:06d}_{}_norm.png'.format(i, name)), to8b(norm))
                     imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_diffuse.png'.format(i, name)), to8b(diffuse))
+                    imageio.imwrite(os.path.join(
                         testimgdir, '{:06d}_{}_sh_light.png'.format(i, name)), to8b(sh_light))
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_diffuse_lit.png'.format(i, name)), to8b(diffuse_lit))
+                    imageio.imwrite(os.path.join(
+                        testimgdir, '{:06d}_{}_sh_lit.png'.format(i, name)), to8b(sh_lit))
                     imageio.imwrite(os.path.join(
                         testimgdir, '{:06d}_{}_depth.png'.format(i, name)), to8b(depth[..., tf.newaxis]))
                     imageio.imwrite(os.path.join(
@@ -1692,9 +1710,11 @@ def train():
 
                     tf.contrib.summary.image('rgb', to8b(rgb)[tf.newaxis])
                     tf.contrib.summary.image('albedo', to8b(albedo)[tf.newaxis])
-                    tf.contrib.summary.image('diffuse', to8b(diffuse)[tf.newaxis])
                     tf.contrib.summary.image('norm', to8b(norm)[tf.newaxis])
+                    tf.contrib.summary.image('diffuse', to8b(diffuse)[tf.newaxis])
                     tf.contrib.summary.image('sh_light', to8b(sh_light)[tf.newaxis])
+                    tf.contrib.summary.image('diffuse_lit', to8b(diffuse_lit)[tf.newaxis])
+                    tf.contrib.summary.image('sh_lit', to8b(sh_lit)[tf.newaxis])
                     tf.contrib.summary.image('depth', depth[tf.newaxis, ..., tf.newaxis])
                     tf.contrib.summary.image('spec', spec[tf.newaxis, ..., tf.newaxis])
                     tf.contrib.summary.image('diffuse_vis', diffuse_vis[tf.newaxis, ..., tf.newaxis])
