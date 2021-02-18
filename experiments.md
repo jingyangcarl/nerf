@@ -51,4 +51,12 @@ Experiments Index: 1
 Detail: Use albedo and normal ground truth like alpha mask directly to the network output. For each ray, duplicate value from 2D to 3D.
 Logs: vgl-gpu03:./logs/*_albedo_normal_gt
 Commit: 1d1cb6481d30e282696efbcd377a29659c34e24d
+Results: It's clear that the results is way sharper, but since all samples share the same albedo and normal along the same ray, the density is not working, leading to the misprediction of the weights along the ray and midprediction of the final color. Also, normal prediction is recommended, so that the network keeps the weights and memorize normal from multiview, which is vital for rendering.
+
+----------------------------------------------------------------------------
+Date: 2021/02/17
+Experiments Index: 2
+Detail: Use albedo ground truth directly, where details can be preserved, and let metwork predict normal with surpervision, so that the density can be preserved on each ray, which will not cause the midprediction on weights in experiment 2021/02/17-1.
+Logs: vgl-gpu04:./logs/*_albedo_gt_normal_loss
+Commit: ccb08170132a102dcdb9948f24e2a203482616db
 Results: 
