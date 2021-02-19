@@ -273,25 +273,27 @@ def render_rays(ray_batch,
             np.sqrt(3.0 / (4.0 * np.pi)) * norm_z,  # l = 1; m = 0
             np.sqrt(3.0 / (4.0 * np.pi)) * norm_x,  # l = 1; m = 1
             # level 2
-            # 1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_y,
-            # 1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_z * norm_y,
-            # 1.0 / 4.0 * np.sqrt(5.0 / np.pi)  * (-norm_x2-norm_y2 + 2.0*norm_z2),
-            # 1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_z,
-            # 1.0 / 4.0 * np.sqrt(15.0 / np.pi) * norm_x2 - norm_y2,
-            # # level 3
-            # 1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (3.0 * norm_x2 - norm_y2) * norm_y,
-            # 1.0 / 2.0 * np.sqrt(105.0 / np.pi)        * norm_x * norm_z * norm_y,
-            # 1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_y * (5.0*norm_z2 - norm_x2 - norm_y2),
-            # 1.0 / 4.0 * np.sqrt(7.0 / np.pi)          * norm_z * (1.5*norm_z2 - 3.0*norm_x2 - 3.0*norm_y2),
-            # 1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_x * (5.0*norm_z2 - norm_x2 - norm_y2),
-            # 1.0 / 4.0 * np.sqrt(105.0 / np.pi)        * (norm_x2 - norm_y2) * norm_z,
-            # 1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (norm_x2 - 3.0*norm_y2) * norm_x
+            1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_y,
+            1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_z * norm_y,
+            1.0 / 4.0 * np.sqrt(5.0 / np.pi)  * (-norm_x2-norm_y2 + 2.0*norm_z2),
+            1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_z,
+            1.0 / 4.0 * np.sqrt(15.0 / np.pi) * norm_x2 - norm_y2,
+            # level 3
+            1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (3.0 * norm_x2 - norm_y2) * norm_y,
+            1.0 / 2.0 * np.sqrt(105.0 / np.pi)        * norm_x * norm_z * norm_y,
+            1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_y * (5.0*norm_z2 - norm_x2 - norm_y2),
+            1.0 / 4.0 * np.sqrt(7.0 / np.pi)          * norm_z * (1.5*norm_z2 - 3.0*norm_x2 - 3.0*norm_y2),
+            1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_x * (5.0*norm_z2 - norm_x2 - norm_y2),
+            1.0 / 4.0 * np.sqrt(105.0 / np.pi)        * (norm_x2 - norm_y2) * norm_z,
+            1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (norm_x2 - 3.0*norm_y2) * norm_x
         ]
         sh_basis = tf.stack(sh_basis, axis=-1) # [N_rays, N_samples, 16]
-        # sh = tf.broadcast_to(sh, sh_basis.shape.as_list()[:2] + list(sh.shape)) # [N_rays, N_samples, 16, 3]
-        # lt_sh = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
-        sh_coef = tf.reshape(sh_local, sh_local.shape.as_list()[:2] + [4, 3]) # [N_rays, N_samples, 4, 3]
-        lt_sh = tf.reduce_sum(sh_coef * sh_basis[..., None], axis=-2)
+
+        sh_coef_global = tf.broadcast_to(sh, sh_basis.shape.as_list()[:2] + list(sh.shape)) # [N_rays, N_samples, 16, 3]
+        lt_sh_global = tf.reduce_sum(sh_coef_global * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
+
+        sh_coef_local = tf.reshape(sh_local, sh_basis.shape.as_list()[:2] + [4, 3]) # [N_rays, N_samples, 4, 3]
+        lt_sh_local = tf.reduce_sum(sh_coef_local * sh_basis[:,:, :4, None], axis=-2)
 
         # for direct light
         # down_step = 100
@@ -352,8 +354,8 @@ def render_rays(ray_batch,
         # Log: *_spec
         # Commit: 8dff0baa64953442eda1188222f88689cdfce25e
         # Results: the results is better than previous experiments expecially on the forehead
-        lt_diffuse_lit = 5.0 * lt_diffuse
-        lt_sh_lit = 1.0 * lt_sh
+        lt_diffuse_lit = 4.0 * lt_diffuse
+        lt_sh_lit = 0.5 * lt_sh_global + lt_sh_local
         lt_spec = spec * lt_diffuse
         rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt + lt_spec
         # rgb = tf.math.sigmoid(raw[..., :3])
@@ -387,11 +389,11 @@ def render_rays(ray_batch,
         diffuse_map = tf.reduce_sum(
             weights[..., None] * lt_diffuse, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         sh_map = tf.reduce_sum(
-            weights[..., None] * lt_sh, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+            weights[..., None] * lt_sh_global, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         diffuse_lit_map = tf.reduce_sum(
             weights[..., None] * lt_diffuse_lit, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         sh_lit_map = tf.reduce_sum(
-            weights[..., None] * lt_sh_lit, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+            weights[..., None] * lt_sh_local, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
 
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1) * mask + (1.-mask)
