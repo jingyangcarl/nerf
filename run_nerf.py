@@ -238,26 +238,22 @@ def render_rays(ray_batch,
         # alpha_material = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
     
         # Extract albedo of each sample position along each ray.
-        albedo = tf.broadcast_to(albedo_gt[:,None,:], alpha.shape.as_list() + [3])
-        # norm = tf.broadcast_to(normal_gt[:,None,:], alpha.shape.as_list() + [3])
-
-        # albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+        albedo = tf.math.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
         norm = 2. * tf.math.sigmoid(raw[..., 4:7]) - 1.  # [N_rays, N_samples, 3]
 
+        albedo_gt = tf.broadcast_to(albedo_gt[:,None,:], alpha.shape.as_list() + [3])
+        norm_gt = tf.broadcast_to(normal_gt[:,None,:], alpha.shape.as_list() + [3])
+
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
-        lt_diffuse_pw = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
-        lt_sh_pw = tf.nn.relu(raw[..., 9])  # [N_rays, N_samples,]
-        lt_vis_diffuse = tf.nn.relu(raw[..., 10])  # [N_rays, N_samples,]
-        lt_vis_sh = tf.nn.relu(raw[..., 11])  # [N_rays, N_samples,]
+        lt_vis_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
+        sh_local = 2. * tf.math.sigmoid(raw[..., 9:21]) - 1.  # [N_rays, N_samples, 12]
 
         spec = spec[..., None]
-        lt_diffuse_pw = tf.reduce_mean(lt_diffuse_pw)
-        lt_sh_pw = tf.reduce_mean(lt_sh_pw)
         lt_vis_diffuse = lt_vis_diffuse[..., None]
-        lt_vis_sh = lt_vis_sh[..., None]
 
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
-        norm_x, norm_y, norm_z = tf.unstack(norm, axis=2)
+        norm_gt = norm_gt / (tf.norm(norm_gt, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
+        norm_x, norm_y, norm_z = tf.unstack(norm_gt, axis=2)
         norm_x2, norm_y2, norm_z2 = norm_x*norm_x, norm_y*norm_y, norm_z*norm_z
 
         # 2021/02/03
@@ -277,23 +273,25 @@ def render_rays(ray_batch,
             np.sqrt(3.0 / (4.0 * np.pi)) * norm_z,  # l = 1; m = 0
             np.sqrt(3.0 / (4.0 * np.pi)) * norm_x,  # l = 1; m = 1
             # level 2
-            1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_y,
-            1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_z * norm_y,
-            1.0 / 4.0 * np.sqrt(5.0 / np.pi)  * (-norm_x2-norm_y2 + 2.0*norm_z2),
-            1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_z,
-            1.0 / 4.0 * np.sqrt(15.0 / np.pi) * norm_x2 - norm_y2,
-            # level 3
-            1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (3.0 * norm_x2 - norm_y2) * norm_y,
-            1.0 / 2.0 * np.sqrt(105.0 / np.pi)        * norm_x * norm_z * norm_y,
-            1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_y * (5.0*norm_z2 - norm_x2 - norm_y2),
-            1.0 / 4.0 * np.sqrt(7.0 / np.pi)          * norm_z * (1.5*norm_z2 - 3.0*norm_x2 - 3.0*norm_y2),
-            1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_x * (5.0*norm_z2 - norm_x2 - norm_y2),
-            1.0 / 4.0 * np.sqrt(105.0 / np.pi)        * (norm_x2 - norm_y2) * norm_z,
-            1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (norm_x2 - 3.0*norm_y2) * norm_x
+            # 1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_y,
+            # 1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_z * norm_y,
+            # 1.0 / 4.0 * np.sqrt(5.0 / np.pi)  * (-norm_x2-norm_y2 + 2.0*norm_z2),
+            # 1.0 / 2.0 * np.sqrt(15.0 / np.pi) * norm_x * norm_z,
+            # 1.0 / 4.0 * np.sqrt(15.0 / np.pi) * norm_x2 - norm_y2,
+            # # level 3
+            # 1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (3.0 * norm_x2 - norm_y2) * norm_y,
+            # 1.0 / 2.0 * np.sqrt(105.0 / np.pi)        * norm_x * norm_z * norm_y,
+            # 1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_y * (5.0*norm_z2 - norm_x2 - norm_y2),
+            # 1.0 / 4.0 * np.sqrt(7.0 / np.pi)          * norm_z * (1.5*norm_z2 - 3.0*norm_x2 - 3.0*norm_y2),
+            # 1.0 / 4.0 * np.sqrt(21.0 / (2.0 * np.pi)) * norm_x * (5.0*norm_z2 - norm_x2 - norm_y2),
+            # 1.0 / 4.0 * np.sqrt(105.0 / np.pi)        * (norm_x2 - norm_y2) * norm_z,
+            # 1.0 / 4.0 * np.sqrt(35.0 / (2.0 * np.pi)) * (norm_x2 - 3.0*norm_y2) * norm_x
         ]
         sh_basis = tf.stack(sh_basis, axis=-1) # [N_rays, N_samples, 16]
-        sh = tf.broadcast_to(sh, sh_basis.shape.as_list()[:2] + list(sh.shape)) # [N_rays, N_samples, 16, 3]
-        lt_sh = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
+        # sh = tf.broadcast_to(sh, sh_basis.shape.as_list()[:2] + list(sh.shape)) # [N_rays, N_samples, 16, 3]
+        # lt_sh = tf.reduce_sum(sh * sh_basis[..., None], axis=-2) # [N_rays, N_samples, 3]
+        sh_coef = tf.reshape(sh_local, sh_local.shape.as_list()[:2] + [4, 3]) # [N_rays, N_samples, 4, 3]
+        lt_sh = tf.reduce_sum(sh_coef * sh_basis[..., None], axis=-2)
 
         # for direct light
         # down_step = 100
@@ -320,7 +318,7 @@ def render_rays(ray_batch,
         l_dir = np.stack([x, y, z], axis=-1).astype(np.float32) # [h*w,3]
         l_weight = np.sin(theta) # [h,]
         l_color = np.reshape(light_probe * l_weight[:, None, None], (-1,3)).astype(np.float32) # [h*w,3]
-        nDotL = tf.maximum(tf.matmul(norm, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
+        nDotL = tf.maximum(tf.matmul(norm_gt, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
         lt_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
 
         # 2021/01/21
@@ -354,8 +352,8 @@ def render_rays(ray_batch,
         # Log: *_spec
         # Commit: 8dff0baa64953442eda1188222f88689cdfce25e
         # Results: the results is better than previous experiments expecially on the forehead
-        lt_diffuse_lit = lt_diffuse_pw * lt_diffuse
-        lt_sh_lit = lt_sh_pw * lt_sh
+        lt_diffuse_lit = 5.0 * lt_diffuse
+        lt_sh_lit = 1.0 * lt_sh
         lt_spec = spec * lt_diffuse
         rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo + lt_spec
         # rgb = tf.math.sigmoid(raw[..., :3])

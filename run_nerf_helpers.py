@@ -124,14 +124,10 @@ def init_nerf_model(D=8, W=256, input_ch=3, input_ch_views=3, input_ch_sh=12, ou
         # used for output spherical harmonics coefficients
         norm_out = dense(3, act=None)(outputs)
         spec_out = dense(1, act=None)(outputs)
-        lt_pw = dense(2, act=None)(outputs) # direct and indirect
-        # lt_pw_diffuse_out = dense(1, act=None)(outputs)
-        # lt_pw_sh_out = dense(1, act=None)(outputs)
-        lt_vis = dense(2, act=None)(outputs)
-        # lt_vis_diffuse_out = dense(1,act=None)(outputs)
-        # lt_vis_sh_out = dense(1, act=None)(outputs)
+        vis_out = dense(1, act=None)(outputs)
+        sh_out = dense(12, act=None)(outputs)
         # outputs = tf.concat([outputs, alpha_out], -1)
-        outputs = tf.concat([outputs, alpha_out, norm_out, spec_out, lt_pw, lt_vis], -1)
+        outputs = tf.concat([outputs, alpha_out, norm_out, spec_out, vis_out, sh_out], -1)
     else:
         outputs = dense(output_ch, act=None)(outputs)
 
