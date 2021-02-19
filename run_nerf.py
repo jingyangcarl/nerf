@@ -355,7 +355,7 @@ def render_rays(ray_batch,
         lt_diffuse_lit = 5.0 * lt_diffuse
         lt_sh_lit = 1.0 * lt_sh
         lt_spec = spec * lt_diffuse
-        rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo + lt_spec
+        rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt + lt_spec
         # rgb = tf.math.sigmoid(raw[..., :3])
 
         # 2021/01/24
@@ -381,7 +381,7 @@ def render_rays(ray_batch,
         rgb_map = tf.reduce_sum(
             weights[..., None] * rgb, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         albedo_map = tf.reduce_sum(
-            weights[..., None] * albedo, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+            weights[..., None] * albedo_gt, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         norm_map = tf.reduce_sum(
             weights[..., None] * norm, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         diffuse_map = tf.reduce_sum(
