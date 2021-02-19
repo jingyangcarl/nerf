@@ -67,4 +67,12 @@ Experiments Index: 1
 Detail: Output diffuse light map, diffuse light map litted, spherical harmonics map, spherical harmoncis map litted. This is used to check if the diffuse light and spherical harmonics lighting looks correct, since previous outputed diffuse light map times 5.0, which is an arbitrary value.
 Logs: vgl-gpu03:./logs/*_lit_diffuse_sh
 Commit: 7cd3ac1ca3392caff23cb6ff0b344079fccb68c8
-Results: 
+Results: The results has scan line noises, which is created by the predicted diffuse power and spherical harmonics power. Since the rendering is completed by batch, whcih is 2048 in the current setting, leading to scan line noises. 
+
+----------------------------------------------------------------------------
+Date: 2021/02/18
+Experiments Index: 2
+Detail: To solve this problem in 2021/02/18-1, we need to remove the predicted diffuse power and predicted spherical harmonics power. In stead we fine tune diffuse visibility map and local spherical harmonics with a static diffuse power say 5.0. So the current output should be albedo(3) + density(1) + normal(3) + specular(1) + diffuse_visibility(1) + sh(4), where albedo and normal can be ignored since we're using normal ground truth.
+Logs: vgl-gpu04:./logs/*_local_sh
+Commit: 0cf3deef083abe8133ec20675169a764190566c0
+Results:
