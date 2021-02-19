@@ -75,4 +75,12 @@ Experiments Index: 2
 Detail: To solve this problem in 2021/02/18-1, we need to remove the predicted diffuse power and predicted spherical harmonics power. In stead we fine tune diffuse visibility map and local spherical harmonics with a static diffuse power say 5.0. So the current output should be albedo(3) + density(1) + normal(3) + specular(1) + diffuse_visibility(1) + sh(4), where albedo and normal can be ignored since we're using normal ground truth.
 Logs: vgl-gpu04:./logs/*_local_sh
 Commit: 0cf3deef083abe8133ec20675169a764190566c0
-Results:
+Results: Local spherical harmonics with gt albedo and gt normal generates the best quality ever. It seems the local spherical harmonics is able to generate scene dependent local lighting model. It's just the local spherical harmonics looks too strong, which can be decomposed into global spherical harmonics and local spherical harmonics
+
+----------------------------------------------------------------------------
+Date: 2021/02/19
+Experiments Index: 1
+Detail: Use gloabl spherical harmonics and local spherical harmonics to model the indirect lighting.
+Logs: vgl-gpu03:./logs/*_sh_local_global
+Commit: 
+Results: 
