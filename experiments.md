@@ -81,6 +81,8 @@ Results: Local spherical harmonics with gt albedo and gt normal generates the be
 Date: 2021/02/19
 Experiments Index: 1
 Detail: Use gloabl spherical harmonics and local spherical harmonics to model the indirect lighting.
-Logs: vgl-gpu03:./logs/*_sh_local_global
-Commit: 
+Logs: vgl-gpu04:./logs/*_sh_local_global
+Commit: 6b79330e6ae85c503830bce96ca8776fe84ce4ec
 Results: 
+
+----------------------------------------------------------------------------
