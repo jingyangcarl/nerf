@@ -355,9 +355,9 @@ def render_rays(ray_batch,
         # Commit: 8dff0baa64953442eda1188222f88689cdfce25e
         # Results: the results is better than previous experiments expecially on the forehead
         lt_diffuse_lit = 4.0 * lt_diffuse
-        lt_sh_lit = 0.5 * lt_sh_global + lt_sh_local
+        lt_sh_lit = 0.5 * lt_sh_local
         lt_spec = spec * lt_diffuse
-        rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt + lt_spec
+        rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt
         # rgb = tf.math.sigmoid(raw[..., :3])
 
         # 2021/01/24
@@ -389,11 +389,11 @@ def render_rays(ray_batch,
         diffuse_map = tf.reduce_sum(
             weights[..., None] * lt_diffuse, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         sh_map = tf.reduce_sum(
-            weights[..., None] * lt_sh_global, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+            weights[..., None] * lt_sh_local, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         diffuse_lit_map = tf.reduce_sum(
             weights[..., None] * lt_diffuse_lit, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
         sh_lit_map = tf.reduce_sum(
-            weights[..., None] * lt_sh_local, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
+            weights[..., None] * lt_sh_lit, axis=-2) * mask[..., None] + (1.-mask[..., None])  # [N_rays, 3]
 
         # Estimated depth map is expected distance.
         depth_map = tf.reduce_sum(weights * z_vals, axis=-1) * mask + (1.-mask)
