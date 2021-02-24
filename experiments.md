@@ -83,6 +83,19 @@ Experiments Index: 1
 Detail: Use gloabl spherical harmonics and local spherical harmonics to model the indirect lighting.
 Logs: vgl-gpu04:./logs/*_sh_local_global
 Commit: 6b79330e6ae85c503830bce96ca8776fe84ce4ec
+Results: it seems global spherical harmonics and local spherical harmonics wont contribute twice. Use them once.
+
+----------------------------------------------------------------------------
+Date: 2021/02/23
+Experiments Index: 1
+Detail: Run experiments on real light stage data (Jing) and remove specular from rendering equation and also remove global spherical harmonics. This experiments is used to test if the provided normal map and albedo lacking eyeballs and teeth are able to generate reasonable results.
+Logs: vgl-gpu04:./logs/*_local_sh_no_spec
+Commit: d36a629cfd7d2689845dab9ab9901ea70ef37ac5
 Results: 
 
 ----------------------------------------------------------------------------
+Date: 2021/02/23
+Experiments Index: 2
+Detail: The current diffuse light power is 4.0 and local shperical harmonics is 0.5. Let's try to adjust these two parameter and see the influence on the final results.
+Logs: vgl-gpu04: ./logs/
+Commit: 
