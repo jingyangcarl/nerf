@@ -98,5 +98,5 @@ Date: 2021/02/23
 Experiments Index: 2
 Detail: The current diffuse light power is 4.0 and local shperical harmonics is 0.5. Let's try to adjust these two parameter and see the influence on the final results. Let's try 6.0 diffuse and 0.5 spherical harmonics
 Logs: vgl-gpu04: ./logs/
-Commit: d36a629cfd7d2689845dab9ab9901ea70ef37ac5
+Commit: e08ba9f4d026586cc5c76ddd215c1107ea81d142
 Results: 
