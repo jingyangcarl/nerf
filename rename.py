@@ -23,7 +23,7 @@ dir_list = [
     'model_jing_sh_38_test', 
     'model_jing_sh_45_test', 
 ]
-name = 'sh_local_global'
+name = 'local_sh_no_spec'
 
 for d in dir_list:
     # get path
