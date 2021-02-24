@@ -97,6 +97,21 @@ Results: looks good, but spherical harmonics lighting map looks a little strong
 Date: 2021/02/23
 Experiments Index: 2
 Detail: The current diffuse light power is 4.0 and local shperical harmonics is 0.5. Let's try to adjust these two parameter and see the influence on the final results. Let's try 6.0 diffuse and 0.5 spherical harmonics
-Logs: vgl-gpu04: ./logs/
+Logs: vgl-gpu04: ./logs/_diffuse_6_0_sh_0_5
 Commit: e08ba9f4d026586cc5c76ddd215c1107ea81d142
+Results: It's clear that there's difference on the final rendering results, let's try if we disable the diffuse light, this will show all the shading components other than albedo
+
+----------------------------------------------------------------------------
+Date: 2021/02/24
+Experiments Index: 1
+Detail: Disable diffuse lighting and left with only local spherial harmonics lighting
+Logs: vgl-gpu04:./logs/_sh_only
+Commit: b60160ffbce7d06b2f79c5252611a8eda7a3adf9
 Results: 
+
+----------------------------------------------------------------------------
+Date: 2021/02/24
+Experiments Index: 2
+Detail: change the lit diffuse output to the multiplication of lit diffuse and diffuse visibility
+Commit: 
+Logs: vgl-gpu04: ./
