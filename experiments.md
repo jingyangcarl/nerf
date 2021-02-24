@@ -91,11 +91,12 @@ Experiments Index: 1
 Detail: Run experiments on real light stage data (Jing) and remove specular from rendering equation and also remove global spherical harmonics. This experiments is used to test if the provided normal map and albedo lacking eyeballs and teeth are able to generate reasonable results.
 Logs: vgl-gpu04:./logs/*_local_sh_no_spec
 Commit: d36a629cfd7d2689845dab9ab9901ea70ef37ac5
-Results: 
+Results: looks good, but spherical harmonics lighting map looks a little strong
 
 ----------------------------------------------------------------------------
 Date: 2021/02/23
 Experiments Index: 2
-Detail: The current diffuse light power is 4.0 and local shperical harmonics is 0.5. Let's try to adjust these two parameter and see the influence on the final results.
+Detail: The current diffuse light power is 4.0 and local shperical harmonics is 0.5. Let's try to adjust these two parameter and see the influence on the final results. Let's try 6.0 diffuse and 0.5 spherical harmonics
 Logs: vgl-gpu04: ./logs/
-Commit: 
+Commit: d36a629cfd7d2689845dab9ab9901ea70ef37ac5
+Results: 
