@@ -115,8 +115,11 @@ Experiments Index: 2
 Detail: Remove 0.5 factor from the rendering equation
 Commit: b6b01a281a0622017adb8ada1edeac74e6d7f647
 Logs: vgl-gpu04:./logs/_sh_only
+Results: 
 
 ----------------------------------------------------------------------------
 Date: 2021/02/25
 Experiments Index: 1
-Detail: change the lit diffuse output to the multiplication of lit diffuse and diffuse visibility and also
+Detail: change the lit diffuse output to the multiplication of lit diffuse and diffuse visibility
+Commit: 1a289204073453e5f2a745ad3359ef79a4adf7c2
+Logs: 
