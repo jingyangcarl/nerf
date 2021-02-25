@@ -105,13 +105,18 @@ Results: It's clear that there's difference on the final rendering results, let'
 Date: 2021/02/24
 Experiments Index: 1
 Detail: Disable diffuse lighting and left with only local spherial harmonics lighting
-Logs: vgl-gpu04:./logs/_sh_only
+Logs: vgl-gpu04:./logs/_sh_only_0.5
 Commit: b60160ffbce7d06b2f79c5252611a8eda7a3adf9
-Results: 
+Results: Using local spherical harmonics only with 0.5 factor cannot lightup the scene properly. Let's see if the local spherical harmonics can lightup the entire scene.
 
 ----------------------------------------------------------------------------
 Date: 2021/02/24
 Experiments Index: 2
-Detail: change the lit diffuse output to the multiplication of lit diffuse and diffuse visibility
-Commit: 
-Logs: vgl-gpu04: ./
+Detail: Remove 0.5 factor from the rendering equation
+Commit: b6b01a281a0622017adb8ada1edeac74e6d7f647
+Logs: vgl-gpu04:./logs/_sh_only
+
+----------------------------------------------------------------------------
+Date: 2021/02/25
+Experiments Index: 1
+Detail: change the lit diffuse output to the multiplication of lit diffuse and diffuse visibility and also
