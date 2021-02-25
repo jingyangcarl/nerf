@@ -355,7 +355,7 @@ def render_rays(ray_batch,
         # Commit: 8dff0baa64953442eda1188222f88689cdfce25e
         # Results: the results is better than previous experiments expecially on the forehead
         lt_diffuse_lit = 6.0 * lt_diffuse
-        lt_sh_lit = 0.5 * lt_sh_local
+        lt_sh_lit = lt_sh_local
         lt_spec = spec * lt_diffuse
         # rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt
         rgb = (lt_sh_lit) * albedo_gt
