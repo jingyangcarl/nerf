@@ -115,11 +115,26 @@ Experiments Index: 2
 Detail: Remove 0.5 factor from the rendering equation
 Commit: b6b01a281a0622017adb8ada1edeac74e6d7f647
 Logs: vgl-gpu04:./logs/_sh_only
-Results: 
+Results: For a single light, using spherical harmonics only can model all lights and generate a realistic shading results, with a pretty good quality. The next thing to do is to run the lighting model on multiple lightings and test on unknown lighting.
 
 ----------------------------------------------------------------------------
 Date: 2021/02/25
 Experiments Index: 1
 Detail: change the lit diffuse output to the multiplication of lit diffuse and diffuse visibility
 Commit: 1a289204073453e5f2a745ad3359ef79a4adf7c2
+Logs: vgl-gpu04:./logs/_diffuse_times_vis
+Results: the multiplication of lit diffuse (10 times diffuse lighting) and diffuse visibility generates a correct results compared with the past global spherical harmonics results. It's just the quality of diffuse visibility is not high resolution enough to be compatible with normal map and albedo map, which needs to be solved somwhow using normal map and albedo since the current diffuse visibility is a predicted visibility map generated from occupancy, which has been proved that nerf cannot generate a high accuracy occupancy field.
+
+----------------------------------------------------------------------------
+Date: 2021/02/26
+Experiments Index: 1
+Detail: make diffuse visibility high resolution
+Commit: 
+Logs: 
+
+----------------------------------------------------------------------------
+Date: 2021/02/26
+Experiments Index: 2
+Detail: input global spherical harmonic
+Commit: 
 Logs: 
