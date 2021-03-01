@@ -97,7 +97,7 @@ Results: looks good, but spherical harmonics lighting map looks a little strong
 Date: 2021/02/23
 Experiments Index: 2
 Detail: The current diffuse light power is 4.0 and local shperical harmonics is 0.5. Let's try to adjust these two parameter and see the influence on the final results. Let's try 6.0 diffuse and 0.5 spherical harmonics
-Logs: vgl-gpu04: ./logs/_diffuse_6_0_sh_0_5
+Logs: vgl-gpu04: ./logs/*_diffuse_6_0_sh_0_5
 Commit: e08ba9f4d026586cc5c76ddd215c1107ea81d142
 Results: It's clear that there's difference on the final rendering results, let's try if we disable the diffuse light, this will show all the shading components other than albedo
 
@@ -105,7 +105,7 @@ Results: It's clear that there's difference on the final rendering results, let'
 Date: 2021/02/24
 Experiments Index: 1
 Detail: Disable diffuse lighting and left with only local spherial harmonics lighting
-Logs: vgl-gpu04:./logs/_sh_only_0.5
+Logs: vgl-gpu04:./logs/*_sh_only_0.5
 Commit: b60160ffbce7d06b2f79c5252611a8eda7a3adf9
 Results: Using local spherical harmonics only with 0.5 factor cannot lightup the scene properly. Let's see if the local spherical harmonics can lightup the entire scene.
 
@@ -114,7 +114,7 @@ Date: 2021/02/24
 Experiments Index: 2
 Detail: Remove 0.5 factor from the rendering equation
 Commit: b6b01a281a0622017adb8ada1edeac74e6d7f647
-Logs: vgl-gpu04:./logs/_sh_only
+Logs: vgl-gpu04:./logs/*_sh_only
 Results: For a single light, using spherical harmonics only can model all lights and generate a realistic shading results, with a pretty good quality. The next thing to do is to run the lighting model on multiple lightings and test on unknown lighting.
 
 ----------------------------------------------------------------------------
@@ -122,7 +122,7 @@ Date: 2021/02/25
 Experiments Index: 1
 Detail: change the lit diffuse output to the multiplication of lit diffuse and diffuse visibility
 Commit: 1a289204073453e5f2a745ad3359ef79a4adf7c2
-Logs: vgl-gpu04:./logs/_diffuse_times_vis
+Logs: vgl-gpu04:./logs/*_diffuse_times_vis
 Results: the multiplication of lit diffuse (10 times diffuse lighting) and diffuse visibility generates a correct results compared with the past global spherical harmonics results. It's just the quality of diffuse visibility is not high resolution enough to be compatible with normal map and albedo map, which needs to be solved somwhow using normal map and albedo since the current diffuse visibility is a predicted visibility map generated from occupancy, which has been proved that nerf cannot generate a high accuracy occupancy field.
 
 ----------------------------------------------------------------------------
@@ -130,7 +130,8 @@ Date: 2021/02/26 -> 2021/03/01
 Experiments Index: 1
 Detail: make diffuse visibility high resolution. One possible way is to generate visibility map from gray scale image of albedo map, since the visibility of the current face should be related to it's albedo or normal. Let's try albedo first and normal then. Compare the results, see if we can improve sharpness. Using Matlab, it's clear that using z channel of normal could be the best, since z channel of the normal map can be viewed as normal light up from the front view.
 Commit: e6d6299c7674408d7ff8f23b74557b98301c4824
-Logs: 
+Logs: vgl-gpu04:./logs/*_vis_normal_z
+Results: 
 
 ----------------------------------------------------------------------------
 Date: 2021/02/26
@@ -138,3 +139,4 @@ Experiments Index: 2
 Detail: input global spherical harmonic
 Commit: 
 Logs: 
+Results: 
