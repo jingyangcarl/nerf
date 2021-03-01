@@ -244,12 +244,15 @@ def render_rays(ray_batch,
         albedo_gt = tf.broadcast_to(albedo_gt[:,None,:], alpha.shape.as_list() + [3])
         norm_gt = tf.broadcast_to(normal_gt[:,None,:], alpha.shape.as_list() + [3])
 
+        norm_gt_ch_z = norm_gt[:,:,2] # [N_rays, N_samples,]
+
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
         lt_vis_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
         sh_local = 2. * tf.math.sigmoid(raw[..., 9:21]) - 1.  # [N_rays, N_samples, 12]
 
         spec = spec[..., None]
-        lt_vis_diffuse = lt_vis_diffuse[..., None]
+        # lt_vis_diffuse = lt_vis_diffuse[..., None]
+        lt_vis_diffuse = lt_vis_diffuse[..., None] * norm_gt_ch_z[..., None]  # [N_rays, N_samples, 1]
 
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
         norm_gt = norm_gt / (tf.norm(norm_gt, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
