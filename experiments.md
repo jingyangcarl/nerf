@@ -126,10 +126,10 @@ Logs: vgl-gpu04:./logs/_diffuse_times_vis
 Results: the multiplication of lit diffuse (10 times diffuse lighting) and diffuse visibility generates a correct results compared with the past global spherical harmonics results. It's just the quality of diffuse visibility is not high resolution enough to be compatible with normal map and albedo map, which needs to be solved somwhow using normal map and albedo since the current diffuse visibility is a predicted visibility map generated from occupancy, which has been proved that nerf cannot generate a high accuracy occupancy field.
 
 ----------------------------------------------------------------------------
-Date: 2021/02/26
+Date: 2021/02/26 -> 2021/03/01
 Experiments Index: 1
-Detail: make diffuse visibility high resolution
-Commit: 
+Detail: make diffuse visibility high resolution. One possible way is to generate visibility map from gray scale image of albedo map, since the visibility of the current face should be related to it's albedo or normal. Let's try albedo first and normal then. Compare the results, see if we can improve sharpness. Using Matlab, it's clear that using z channel of normal could be the best, since z channel of the normal map can be viewed as normal light up from the front view.
+Commit: e6d6299c7674408d7ff8f23b74557b98301c4824
 Logs: 
 
 ----------------------------------------------------------------------------
