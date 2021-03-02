@@ -250,8 +250,7 @@ def render_rays(ray_batch,
         lt_vis_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
         sh_local = 2. * tf.math.sigmoid(raw[..., 9:21]) - 1.  # [N_rays, N_samples, 12]
 
-        spec = spec[..., None]
-        # lt_vis_diffuse = lt_vis_diffuse[..., None]
+        spec = spec[..., None] * norm_gt_ch_z[..., None] # [N_rays, N_samples, 1]
         lt_vis_diffuse = lt_vis_diffuse[..., None] * norm_gt_ch_z[..., None]  # [N_rays, N_samples, 1]
 
         norm = norm / (tf.norm(norm, axis=2, keepdims=True) + 1e-6)  # [N_rays, N_samples, 3]
@@ -358,9 +357,10 @@ def render_rays(ray_batch,
         # Commit: 8dff0baa64953442eda1188222f88689cdfce25e
         # Results: the results is better than previous experiments expecially on the forehead
         lt_diffuse_lit = 10.0 * lt_diffuse
-        lt_sh_lit = lt_sh_local
+        lt_sh_lit = 0.5 * lt_sh_local
         lt_spec = spec * lt_diffuse
-        rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt
+        # rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt
+        rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt + lt_spec
         # rgb = (lt_sh_lit) * albedo_gt
         # rgb = tf.math.sigmoid(raw[..., :3])
 
