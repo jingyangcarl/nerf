@@ -131,7 +131,16 @@ Experiments Index: 1
 Detail: make diffuse visibility high resolution. One possible way is to generate visibility map from gray scale image of albedo map, since the visibility of the current face should be related to it's albedo or normal. Let's try albedo first and normal then. Compare the results, see if we can improve sharpness. Using Matlab, it's clear that using z channel of normal could be the best, since z channel of the normal map can be viewed as normal light up from the front view.
 Commit: e6d6299c7674408d7ff8f23b74557b98301c4824
 Logs: vgl-gpu04:./logs/*_vis_normal_z
+Results: The results looks good, the visiblity map looks good. Let's use z channel of the normal map to generate visibility map. Compared with the final results, the spherical harmonics looks a little strong than diffuse and also the rendered results lacking of specular map. Let's add specular also from normal z with specular term.
+
+----------------------------------------------------------------------------
+Date: 2021/03/02
+Experiments Index: 1
+Detail: Try lighter spherical harmonics lighting with maybe 0.5 as a factor and also generate a specular from normal z
+Commit: dc78716336d1f361005f48a4b7036a2b555d2bb3
+Logs: vgl-gpu04:./logs/*_spec_normal_z
 Results: 
+
 
 ----------------------------------------------------------------------------
 Date: 2021/02/26
