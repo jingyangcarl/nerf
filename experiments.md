@@ -145,7 +145,7 @@ Results: using 0.5 times spherical harmonics lighting and specular generates a r
 Date: 2021/03/03->2021/03/04
 Experiments Index: 1
 Detail: let's try to use litted diffuse light as specular.
-Commit: 
+Commit: ffe48a7fb6b9fd47a38a52bdf8f2fb964cc48ad0
 Logs: vgl-gpu04:./logs/*_spec_lit
 Results: 
 
