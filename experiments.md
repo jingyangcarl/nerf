@@ -139,8 +139,23 @@ Experiments Index: 1
 Detail: Try lighter spherical harmonics lighting with maybe 0.5 as a factor and also generate a specular from normal z
 Commit: dc78716336d1f361005f48a4b7036a2b555d2bb3
 Logs: vgl-gpu04:./logs/*_spec_normal_z
+Results: using 0.5 times spherical harmonics lighting and specular generates a results with obvious noise on the side face, which need to be figured out. Also, the results is not as good as using only previous experiments.
+
+----------------------------------------------------------------------------
+Date: 2021/03/03->2021/03/04
+Experiments Index: 1
+Detail: let's try to use litted diffuse light as specular.
+Commit: 
+Logs: vgl-gpu04:./logs/*_spec_lit
 Results: 
 
+----------------------------------------------------------------------------
+Date: 2021/03/04
+Experiments Index: 2
+Detail: using jupyter notebook and check out if the local spherical harmonics has same values everywhere in the field.
+Commit: 
+Logs: Null
+Results: 
 
 ----------------------------------------------------------------------------
 Date: 2021/02/26
