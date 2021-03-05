@@ -147,11 +147,18 @@ Experiments Index: 1
 Detail: let's try to use litted diffuse light as specular.
 Commit: ffe48a7fb6b9fd47a38a52bdf8f2fb964cc48ad0
 Logs: vgl-gpu04:./logs/*_spec_lit
-Results: 
+Results: Take a close look at the noise mentioned in the previous experiment, the displacement on the forehead seems more realistic than Maya rendering. Even if the displacement on the cheeks seems a little too much, We indeed generated a results with a lot details.
 
 ----------------------------------------------------------------------------
 Date: 2021/03/04
 Experiments Index: 2
+Detail: Generate another facial dataset and run experiment ffe48a7fb6b9fd47a38a52bdf8f2fb964cc48ad0 see if the displacement can be generated.
+Logs: vgl-gpu04: ./logs/*spec_lit
+Results: 
+
+----------------------------------------------------------------------------
+Date: 2021/03/04
+Experiments Index: 3
 Detail: using jupyter notebook and check out if the local spherical harmonics has same values everywhere in the field.
 Commit: 
 Logs: Null
