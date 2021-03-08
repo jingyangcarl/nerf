@@ -1,9 +1,9 @@
-expname = model_1_partial_test
+expname = model_jing_partial_6_test
 basedir = ./logs
-datadir = /glab2/data/Users/jyang/data/nerf_synthesic/model_1_partial
+datadir = /mount/Users/jyang/data/nerf_synthesic/model_jing_partial_6
 dataset_type = lightstage
 
-half_res = True
+half_res = False
 no_batching = True
 
 N_samples = 64

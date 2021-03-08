@@ -153,8 +153,8 @@ Results: Take a close look at the noise mentioned in the previous experiment, th
 Date: 2021/03/04
 Experiments Index: 2
 Detail: Generate another facial dataset and run experiment ffe48a7fb6b9fd47a38a52bdf8f2fb964cc48ad0 see if the displacement can be generated.
-Logs: vgl-gpu04: ./logs/*spec_lit
-Results: 
+Logs: vgl-gpu04: ./logs/*_spec_lit
+Results:
 
 ----------------------------------------------------------------------------
 Date: 2021/03/04

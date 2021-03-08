@@ -1,6 +1,6 @@
-expname = model_1_sh_24_test
+expname = model_evan_sh_24_test
 basedir = ./logs
-datadir = /glab2/Users/jyang/data/nerf_synthesic/model_1_sh_24
+datadir = /mount/Users/jyang/data/nerf_synthesic/model_evan_sh_24
 dataset_type = lightstage
 
 half_res = False

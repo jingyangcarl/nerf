@@ -1,6 +1,6 @@
-expname = model_1_sh_45_test
+expname = model_evan_sh_45_test
 basedir = ./logs
-datadir = /glab2/Users/jyang/data/nerf_synthesic/model_1_sh_45
+datadir = /mount/Users/jyang/data/nerf_synthesic/model_evan_sh_45
 dataset_type = lightstage
 
 half_res = False
@@ -15,7 +15,7 @@ white_bkgd = True
 
 N_rand = 1024
 chunk = 2048
-lrate = 5e-4
+lrate = 1e-4
 
 testskip = 1
 i_img = 1000
