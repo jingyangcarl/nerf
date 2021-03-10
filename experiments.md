@@ -167,7 +167,7 @@ Results:
 ----------------------------------------------------------------------------
 Date: 2021/02/26
 Experiments Index: 2
-Detail: input global spherical harmonic
+Detail: make the changes from nerf_relightable branch to nerf_relightable_sh_input branch, where the branch should be able to take the hdr global spherical harmonics lighting as input 
 Commit: 
 Logs: 
 Results: 
