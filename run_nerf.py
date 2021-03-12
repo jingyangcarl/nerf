@@ -324,6 +324,14 @@ def render_rays(ray_batch,
         l_color = np.reshape(light_probe * l_weight[:, None, None], (-1,3)).astype(np.float32) # [h*w,3]
         nDotL = tf.maximum(tf.matmul(norm_gt, l_dir, transpose_b=True) / l_color.shape[0], 0.) # [N_rays, N_samples, 3] * [3, h*w] -> [N_rays, N_samples, h*w]
         lt_diffuse = tf.matmul(nDotL, l_color) # [N_rays, N_samples, h*w] * [h*w,3] -> [N_rays, N_samples, 3]
+        # some notes here: 
+        # for each samples on the ray, the light direction (l_dir) should vary based on the samples position in the coordinate system
+        # which means for N_rays * N_samples, light direction should be different
+        # However, since the diffuse light is environmental lighting, which can be views as diffuse lights far away from objects
+        # Since it's hard to calculate accurate light direction, which leads to a detail consideration on specularity
+
+        r_dir = l_dir - 2.0 * nDotL * norm_gt # [h*w,3] - [N_rays, N_samples, h*w] * [N_rays, N_samples, 3]
+
 
         # 2021/01/21
         # test if model_1_sh_* data works for my case
