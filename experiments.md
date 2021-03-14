@@ -160,7 +160,7 @@ Results:
 Date: 2021/03/10
 Experiments Index: 1
 Detail: using jupyter notebook and check out if the local spherical harmonics has same values everywhere in the field.
-Commit: 
+Commit: 12b244a8417e1c27fffb895a3639657ed4e49aa6
 Logs: Null
 Results: local spherical harmonics are not the same everywhere in the grid, but still we are able to save the grid out with local spherical harmonics, visibility and specularity. For local spherical harmonics, 64*64*64*12 parameters takes around 80MB, which is reusable when rendering different faces.
 
