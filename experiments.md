@@ -150,24 +150,40 @@ Logs: vgl-gpu04:./logs/*_spec_lit
 Results: Take a close look at the noise mentioned in the previous experiment, the displacement on the forehead seems more realistic than Maya rendering. Even if the displacement on the cheeks seems a little too much, We indeed generated a results with a lot details.
 
 ----------------------------------------------------------------------------
-Date: 2021/03/04
-Experiments Index: 2
+Date: 2021/03/04->2021/03/06
+Experiments Index: 1
 Detail: Generate another facial dataset and run experiment ffe48a7fb6b9fd47a38a52bdf8f2fb964cc48ad0 see if the displacement can be generated.
 Logs: vgl-gpu04: ./logs/*_spec_lit
 Results:
 
 ----------------------------------------------------------------------------
-Date: 2021/03/04
-Experiments Index: 3
+Date: 2021/03/10
+Experiments Index: 1
 Detail: using jupyter notebook and check out if the local spherical harmonics has same values everywhere in the field.
 Commit: 
 Logs: Null
-Results: 
+Results: local spherical harmonics are not the same everywhere in the grid, but still we are able to save the grid out with local spherical harmonics, visibility and specularity. For local spherical harmonics, 64*64*64*12 parameters takes around 80MB, which is reusable when rendering different faces.
 
 ----------------------------------------------------------------------------
-Date: 2021/02/26
-Experiments Index: 2
-Detail: make the changes from nerf_relightable branch to nerf_relightable_sh_input branch, where the branch should be able to take the hdr global spherical harmonics lighting as input 
+Date: 2021/03/12
+Experiments: 1
+Detail: make the code able to render a new face using pre trained model on some given face as well as albedo & normal maps of the new faces.
+Commit: 5b4b157bea696d779ff39be4ce83e37183f46214
+Logs: Null
+Results: results like diffuse light and local spherical harmonics looks correct since it's based on normal map of the new face, however, since the diffuse visibility map is highly related on the training dataset, diffuse visibility looks not correct, which should be correct in the next experiment where a pretrained diffuse visibility should be used for rendering.
+
+----------------------------------------------------------------------------
+Date: 2021/03/14
+Experiments: 1
+Detail: Use pretrained diffuse visibility as well as new face albedo / normal maps for neural face rendering.
+Commit: 
+Logs: Null
+Results:
+
+----------------------------------------------------------------------------
+Date: 2021/03/11
+Experiments Index: 1
+Detail: add power term to specularity like what's introduced in (https://learnopengl.com/Lighting/Basic-Lighting), where the specularity should be calculated based on the light direction, normal, and view direction.
 Commit: 
 Logs: 
 Results: 
