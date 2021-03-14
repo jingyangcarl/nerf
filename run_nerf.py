@@ -330,7 +330,7 @@ def render_rays(ray_batch,
         # However, since the diffuse light is environmental lighting, which can be views as diffuse lights far away from objects
         # Since it's hard to calculate accurate light direction, which leads to a detail consideration on specularity
 
-        r_dir = l_dir - 2.0 * nDotL * norm_gt # [h*w,3] - [N_rays, N_samples, h*w] * [N_rays, N_samples, 3]
+        # r_dir = l_dir - 2.0 * nDotL * norm_gt # [h*w,3] - [N_rays, N_samples, h*w] * [N_rays, N_samples, 3]
 
 
         # 2021/01/21
@@ -366,7 +366,8 @@ def render_rays(ray_batch,
         # Results: the results is better than previous experiments expecially on the forehead
         lt_diffuse_lit = 10.0 * lt_diffuse
         lt_sh_lit = 0.5 * lt_sh_local
-        lt_spec = spec * lt_diffuse_lit
+        lt_spec = spec * lt_diffuse
+        # lt_spec = spec * lt_diffuse ** 32
         # rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt
         rgb = (lt_vis_diffuse * lt_diffuse_lit + lt_sh_lit) * albedo_gt + lt_spec
         # rgb = (lt_sh_lit) * albedo_gt
@@ -901,14 +902,6 @@ def render(H, W, focal,
 
 def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normals_gt, chunk, render_kwargs, names=None, gt_imgs=None, savedir=None, render_factor=0):
 
-    # H, W, focal = hwf
-
-    # if render_factor != 0:
-    #     # Render downsampled for speed
-    #     H = H//render_factor
-    #     W = W//render_factor
-    #     focal = focal/render_factor
-
     # if shs.ndim == 2:
     #     shs = shs[np.newaxis, ...]
     # if hwfs.ndim == 1:
@@ -988,9 +981,9 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normal
             sh_light8 = to8b(sh_lights[-1])
             diffuse_lit8 = to8b(diffuse_lits[-1])
             sh_lit8 = to8b(sh_lits[-1])
-            depth8 = to8b(depths[-1])
-            spec8 = to8b(specs[-1])
-            diffuse_vis8 = to8b(diffuse_vises[-1])
+            depth8 = to8b(depths[-1][..., tf.newaxis])
+            spec8 = to8b(specs[-1][..., tf.newaxis])
+            diffuse_vis8 = to8b(diffuse_vises[-1][..., tf.newaxis])
             # filename = os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i]))
             imageio.imwrite(os.path.join(
                 savedir, '{:03d}_{}.png'.format(i, names[i])), rgb8)
@@ -1331,6 +1324,12 @@ def train():
         # load data
         images, light_probes, albedos_gt, normals_gt, names, poses, hwfs, shs, render_poses, i_split = load_lightstage_data(
             basedir=args.datadir, half_res=args.half_res, testskip=args.testskip)
+
+        images_2, light_probes_2, albedos_gt_2, normals_gt_2, names_2, poses_2, hwfs_2, shs_2, render_poses_2, i_split = load_lightstage_data(
+            basedir='/mount/Users/jyang/data/nerf_synthesic/model_jing_sh_24',
+            half_res=False,
+            testskip=1
+        )
         print('Loaded lightstage', images.shape, poses.shape,
               hwfs.shape, shs.shape, render_poses.shape, args.datadir)
 
@@ -1357,6 +1356,11 @@ def train():
             images = images[..., :3]*images[..., -1:] + (1.-images[..., -1:])
             albedos_gt = albedos_gt[..., :3]*albedos_gt[..., -1:] + (1.-albedos_gt[..., -1:])
             normals_gt = normals_gt[..., :3]*normals_gt[..., -1:] + (1.-normals_gt[..., -1:])
+            
+            masks_2 = images_2[..., -1:]
+            images_2 = images_2[..., :3]*images_2[..., -1:] + (1.-images_2[..., -1:])
+            albedos_gt_2 = albedos_gt_2[..., :3]*albedos_gt_2[..., -1:] + (1.-albedos_gt_2[..., -1:])
+            normals_gt_2 = normals_gt_2[..., :3]*normals_gt_2[..., -1:] + (1.-normals_gt_2[..., -1:])
             # images = images[..., :3]*images[..., -1:]
             # albedos_gt = albedos_gt[..., :3]*albedos_gt[..., -1:]
             # normals_gt = normals_gt[..., :3]*normals_gt[..., -1:]
@@ -1424,12 +1428,12 @@ def train():
     # Short circuit if only rendering out from trained model
     if args.render_only:
         print('RENDER ONLY')
-        if args.render_test:
+        # if args.render_test:
             # render_test switches to test poses
-            images = images[i_test]
-        else:
+            # images = images[i_test]
+        # else:
             # Default is smoother render_poses path
-            images = None
+            # images = None
 
         testsavedir = os.path.join(basedir, expname, 'renderonly_{}_{:06d}'.format(
             'test' if args.render_test else 'path', start))
@@ -1437,7 +1441,9 @@ def train():
         print('test poses shape', render_poses.shape)
 
         # rgbs, _ = render_path(render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test,
-        #                       gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
+                            #   gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
+        # render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks[i_test], albedos_gt[i_test], normals_gt[i_test], args.chunk, render_kwargs_test, names=names[i_test], gt_imgs=images[i_test], savedir=testsavedir, render_factor=args.render_factor)
+        render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks_2[i_test], albedos_gt_2[i_test], normals_gt_2[i_test], args.chunk, render_kwargs_test, names=names[i_test], gt_imgs=images_2[i_test], savedir=testsavedir, render_factor=args.render_factor)
         print('Done rendering', testsavedir)
         # imageio.mimwrite(os.path.join(testsavedir, 'video.mp4'),to8b(rgbs), fps=30, quality=8)
 
