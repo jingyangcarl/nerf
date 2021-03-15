@@ -176,9 +176,9 @@ Results: results like diffuse light and local spherical harmonics looks correct 
 Date: 2021/03/14
 Experiments: 1
 Detail: Use pretrained diffuse visibility as well as new face albedo / normal maps for neural face rendering.
-Commit: 
+Commit: c410ff845ffbe0e000509befa4d805e81b08bada
 Logs: Null
-Results:
+Results: the results look good, which means it's possible to do face replacement under certain environmental lighting (fine tune)
 
 ----------------------------------------------------------------------------
 Date: 2021/03/11
