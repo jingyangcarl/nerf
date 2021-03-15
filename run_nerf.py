@@ -11,6 +11,7 @@ import numpy as np
 import tensorflow as tf
 import sys
 import os
+import copy
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 
@@ -194,7 +195,7 @@ def render_rays(ray_batch,
         # return rgb_map, albedo_map, sh_map, spec_map, sh_coef_out, disp_map, acc_map, weights, depth_map
         return albedo_map, norm_map, weights
 
-    def raw2outputs_test(raw, raw_material, z_vals, rays_d, sh, light_probe, mask, albedo_gt, normal_gt):
+    def raw2outputs_test(raw, raw_material, z_vals, rays_d, sh, light_probe, mask, albedo_gt, normal_gt, raw_=None):
         """Transforms model's predictions to semantically meaningful values.
 
         Args:
@@ -234,7 +235,7 @@ def render_rays(ray_batch,
 
         # Predict density of each sample along each ray. Higher values imply
         # higher likelihood of being absorbed at this point.
-        alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
+        alpha = raw2alpha(raw_[..., 3] + noise, dists)  # [N_rays, N_samples]
         # alpha_material = raw2alpha(raw_material[..., 3] + noise, dists)  # [N_rays, N_samples]
     
         # Extract albedo of each sample position along each ray.
@@ -247,7 +248,7 @@ def render_rays(ray_batch,
         norm_gt_ch_z = norm_gt[:,:,2] # [N_rays, N_samples,]
 
         spec = tf.math.sigmoid(raw[..., 7])  # [N_rays, N_samples,]
-        lt_vis_diffuse = tf.nn.relu(raw[..., 8])  # [N_rays, N_samples,]
+        lt_vis_diffuse = tf.nn.relu(raw_[..., 8])  # [N_rays, N_samples,]
         sh_local = 2. * tf.math.sigmoid(raw[..., 9:21]) - 1.  # [N_rays, N_samples, 12]
 
         spec = spec[..., None] * norm_gt_ch_z[..., None] # [N_rays, N_samples, 1]
@@ -757,11 +758,10 @@ def render_rays(ray_batch,
         # raws['raw_negz'] = network_query_fn(pts_negz, viewdirs, run_occupancy)
         # raws['raw_material'] = network_query_fn(pts, viewdirs, run_material)
         if network_fn_ is not None:
-            # run_fn_ = network_fn_ if network_fine_ is None else network_fine_
-            # raw_ = network_query_fn_(pts, viewdirs, run_fn_)
-            # rgb_map, albedo_map, weights = raw2outputs(
-            #     raw, z_vals, rays_d, raw_)
-            pass
+            run_fn_ = network_fn_ if network_fine_ is None else network_fine_
+            raw_ = network_query_fn_(pts, viewdirs, run_fn_)
+            rgb_map, albedo_map, norm_map, diffuse_map, sh_map, diffuse_lit_map, sh_lit_map, depth_map, spec_map, diffuse_vis_map, weights = raw2outputs_test(
+                raw, raw_material, z_vals, rays_d, sh, light_probe, mask, albedo_gt, normal_gt, raw_=raw_)
         else:
             # rgb_1, _ = raw2outputs(raw, z_vals, rays_d)
             # rgb_map, albedo_map, diffuse_map, norm_map, sh_map, depth_map, weights = raws2outputs(
@@ -984,7 +984,9 @@ def render_path(render_poses, hwfs, shs, light_probes, masks, albedos_gt, normal
             depth8 = to8b(depths[-1][..., tf.newaxis])
             spec8 = to8b(specs[-1][..., tf.newaxis])
             diffuse_vis8 = to8b(diffuse_vises[-1][..., tf.newaxis])
-            # filename = os.path.join(savedir, '{:03d}_{}.png'.format(i, names[i]))
+            # filename = os.path.join(savedir, '{:03d}_{}.
+            # 
+            # png'.format(i, names[i]))
             imageio.imwrite(os.path.join(
                 savedir, '{:03d}_{}.png'.format(i, names[i])), rgb8)
             imageio.imwrite(os.path.join(
@@ -1425,6 +1427,14 @@ def train():
     render_kwargs_train.update(bds_dict)
     render_kwargs_test.update(bds_dict)
 
+    # hack here to load Jing's model for visibility map
+    args_jing = copy.deepcopy(args)
+    args_jing.expname = 'model_jing_sh_24_test_spec_lit'
+    args_jing.datadir = '/mount/Users/jyang/data/nerf_synthesic/model_jing_sh_24'
+    render_kwargs_train_jing, render_kwargs_test_jing, start_jing, grad_vars_jing, models_jing = create_nerf(args_jing)
+    render_kwargs_train_jing.update(bds_dict)
+    render_kwargs_test_jing.update(bds_dict)
+
     # Short circuit if only rendering out from trained model
     if args.render_only:
         print('RENDER ONLY')
@@ -1443,7 +1453,24 @@ def train():
         # rgbs, _ = render_path(render_poses, hwf_avg, sh_default, args.chunk, render_kwargs_test,
                             #   gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
         # render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks[i_test], albedos_gt[i_test], normals_gt[i_test], args.chunk, render_kwargs_test, names=names[i_test], gt_imgs=images[i_test], savedir=testsavedir, render_factor=args.render_factor)
-        render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks_2[i_test], albedos_gt_2[i_test], normals_gt_2[i_test], args.chunk, render_kwargs_test, names=names[i_test], gt_imgs=images_2[i_test], savedir=testsavedir, render_factor=args.render_factor)
+        if render_kwargs_test_jing is not None:
+            # combine rendering arguments, check out commits at: 6ba7abab235956c8a5752d552a7d8610937b48d2
+            render_kwargs_test_all = render_kwargs_test.copy()
+            for key in render_kwargs_test_jing:
+                filter = {
+                    'use_viewdirs': True,
+                    'ndc': True,
+                    'near': True,
+                    'far': True,
+                    'ray_width': True,
+                }
+                if filter.get(key): continue
+                render_kwargs_test_all[key+'_'] = render_kwargs_test_jing[key]
+            render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks_2[i_test], albedos_gt_2[i_test], normals_gt_2[i_test], args.chunk, render_kwargs_test_all, names=names[i_test], gt_imgs=images_2[i_test], savedir=testsavedir, render_factor=args.render_factor)
+        else:
+            render_path(poses[i_test], hwfs[i_test], shs[i_test], light_probes[i_test], masks_2[i_test], albedos_gt_2[i_test], normals_gt_2[i_test], args.chunk, render_kwargs_test, names=names[i_test], gt_imgs=images_2[i_test], savedir=testsavedir, render_factor=args.render_factor)
+        
+        
         print('Done rendering', testsavedir)
         # imageio.mimwrite(os.path.join(testsavedir, 'video.mp4'),to8b(rgbs), fps=30, quality=8)
 
